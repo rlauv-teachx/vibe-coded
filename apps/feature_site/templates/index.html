@@ -2,10 +2,10 @@
 
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link active" href="#">Distinct Feature Identifier</a>
+        <a class="nav-link active" href="[[=URL('index')]]">Distinct Feature Identifier</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link disabled" href="#">Coming Soon</a>
+        <a class="nav-link" href="[[=URL('sample_generator')]]">Sample Generator</a>
     </li>
 </ul>
 
@@ -14,7 +14,7 @@
         <div class="card">
             <div class="card-header">Configuration</div>
             <div class="card-body">
-                <form action="[[=URL('process_image')]]" method="POST" enctype="multipart/form-data">
+                <form action="[[=URL('index')]]" method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label class="form-label">Image</label>
                         <input type="file" name="image" class="form-control" required accept=".jpg,.jpeg,.png,.webp">
@@ -66,10 +66,176 @@
                 <span class="badge bg-success">Found [[=len(results['bounding_boxes'])]] features</span>
                 <span class="badge bg-secondary">[[=f"{results['processing_time_ms']:.2f} ms"]]</span>
             </div>
-            <div class="card-body text-center">
-                <img src="[[=overlay_url]]" class="img-fluid border rounded" alt="Processed Image">
+            <div class="card-body">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <!-- Zoom controls -->
+                        <div class="btn-group btn-group-sm mb-2">
+                            <button type="button" class="btn btn-outline-secondary" onclick="zoomImage(-1)">−</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetZoom()">Reset</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="zoomImage(1)">+</button>
+                            <input type="text" class="form-control form-control-sm" id="zoomLevel" 
+                                   style="width: 70px; text-align: center;" value="100%">
+                        </div>
+                        <!-- Draggable image container -->
+                        <div id="imageContainer" class="border rounded bg-secondary bg-opacity-10" 
+                             style="height: 400px; overflow: hidden; cursor: grab; position: relative;">
+                            <img id="resultImage" src="[[=overlay_url]]" alt="Processed Image" 
+                                 style="position: absolute; image-rendering: pixelated; transform-origin: 0 0;"
+                                 draggable="false">
+                        </div>
+                        <div class="form-text">Drag to pan • Scroll to zoom • Double-click to reset</div>
+                    </div>
+                    <div class="text-nowrap">
+                        <div class="bg-light rounded p-2 text-center">
+                            <div class="text-muted small">Dimensions</div>
+                            <div class="fw-bold">[[=image_width]] × [[=image_height]]</div>
+                            <div class="text-muted small">pixels</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+        
+        <script>
+        (function() {
+            const container = document.getElementById('imageContainer');
+            const img = document.getElementById('resultImage');
+            let scale = 1;
+            let panX = 0, panY = 0;
+            let isDragging = false;
+            let startX, startY;
+            
+            function updateTransform() {
+                img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+                document.getElementById('zoomLevel').value = Math.round(scale * 100) + '%';
+            }
+            
+            function setZoomFromInput() {
+                const input = document.getElementById('zoomLevel');
+                const value = parseInt(input.value.replace('%', ''), 10);
+                if (!isNaN(value) && value >= 1 && value <= 2000) {
+                    const containerW = container.clientWidth;
+                    const containerH = container.clientHeight;
+                    const centerX = containerW / 2;
+                    const centerY = containerH / 2;
+                    
+                    const oldScale = scale;
+                    scale = value / 100;
+                    
+                    // Keep centered
+                    panX = centerX - (centerX - panX) * (scale / oldScale);
+                    panY = centerY - (centerY - panY) * (scale / oldScale);
+                    updateTransform();
+                } else {
+                    // Reset to current value if invalid
+                    input.value = Math.round(scale * 100) + '%';
+                }
+            }
+            
+            function initView() {
+                const containerW = container.clientWidth;
+                const containerH = container.clientHeight;
+                const imgW = img.naturalWidth;
+                const imgH = img.naturalHeight;
+                
+                // For small images, upscale to fit container (min 2x)
+                // For large images, scale down to fit
+                const fitScale = Math.min(containerW / imgW, containerH / imgH);
+                if (imgW < containerW && imgH < containerH) {
+                    scale = Math.max(fitScale, 2); // At least 2x for small images
+                } else {
+                    scale = fitScale;
+                }
+                
+                // Center the image
+                panX = (containerW - imgW * scale) / 2;
+                panY = (containerH - imgH * scale) / 2;
+                updateTransform();
+            }
+            
+            function zoomImage(dir) {
+                const containerW = container.clientWidth;
+                const containerH = container.clientHeight;
+                const centerX = containerW / 2;
+                const centerY = containerH / 2;
+                
+                const oldScale = scale;
+                scale = Math.max(0.5, Math.min(20, scale * (dir > 0 ? 1.25 : 0.8)));
+                
+                panX = centerX - (centerX - panX) * (scale / oldScale);
+                panY = centerY - (centerY - panY) * (scale / oldScale);
+                updateTransform();
+            }
+            
+            function resetZoom() {
+                initView();
+            }
+            
+            // Initialize on image load
+            img.onload = initView;
+            
+            // If image already loaded (cached), init now
+            if (img.complete) {
+                initView();
+            }
+            
+            // Drag to pan
+            container.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX - panX;
+                startY = e.clientY - panY;
+                container.style.cursor = 'grabbing';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                updateTransform();
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                container.style.cursor = 'grab';
+            });
+            
+            // Scroll to zoom
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const oldScale = scale;
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                scale = Math.max(0.5, Math.min(20, scale * delta));
+                
+                // Zoom toward mouse position
+                panX = mouseX - (mouseX - panX) * (scale / oldScale);
+                panY = mouseY - (mouseY - panY) * (scale / oldScale);
+                updateTransform();
+            });
+            
+            // Double-click to reset
+            container.addEventListener('dblclick', resetZoom);
+            
+            // Zoom input field - Enter to apply, blur to apply
+            const zoomInput = document.getElementById('zoomLevel');
+            zoomInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setZoomFromInput();
+                    zoomInput.blur();
+                }
+            });
+            zoomInput.addEventListener('blur', setZoomFromInput);
+            
+            // Expose functions for buttons
+            window.zoomImage = zoomImage;
+            window.resetZoom = resetZoom;
+        })();
+        </script>
         
         <div class="card">
             <div class="card-header">Detections</div>

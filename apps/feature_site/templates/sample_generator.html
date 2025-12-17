@@ -1,0 +1,162 @@
+[[extend 'layout.html']]
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('index')]]">Distinct Feature Identifier</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="[[=URL('sample_generator')]]">Sample Generator</a>
+    </li>
+</ul>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Generator Settings</div>
+            <div class="card-body">
+                <form action="[[=URL('sample_generator')]]" method="POST">
+                    <h6>Image Size</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">Width</label>
+                            <input type="number" name="img_width" class="form-control" value="[[=form_data.get('img_width', 200)]]" min="50" max="2000">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Height</label>
+                            <input type="number" name="img_height" class="form-control" value="[[=form_data.get('img_height', 200)]]" min="50" max="2000">
+                        </div>
+                    </div>
+                    
+                    <h6>Features</h6>
+                    <div class="mb-3">
+                        <label class="form-label small">Number of Features</label>
+                        <input type="number" name="num_features" class="form-control" value="[[=form_data.get('num_features', 5)]]" min="1" max="50">
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">Min Size</label>
+                            <input type="number" name="min_size" class="form-control" value="[[=form_data.get('min_size', 10)]]" min="5" max="500">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Max Size</label>
+                            <input type="number" name="max_size" class="form-control" value="[[=form_data.get('max_size', 40)]]" min="5" max="500">
+                        </div>
+                    </div>
+                    
+                    <h6>Colors</h6>
+                    <div class="mb-3">
+                        <label class="form-label small">Background Color</label>
+                        <input type="color" name="bg_color" class="form-control form-control-color w-100" value="[[=form_data.get('bg_color', '#e8e8e8')]]">
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="random_colors" class="form-check-input" id="randomColors" 
+                               [[if form_data.get('random_colors', True):]]checked[[pass]]>
+                        <label class="form-check-label" for="randomColors">Random feature colors</label>
+                    </div>
+                    
+                    <div class="mb-3" id="featureColorPicker" style="[[if form_data.get('random_colors', True):]]display:none[[pass]]">
+                        <label class="form-label small">Feature Color</label>
+                        <input type="color" name="feature_color" class="form-control form-control-color w-100" value="[[=form_data.get('feature_color', '#ff0000')]]">
+                    </div>
+                    
+                    <h6>Shape</h6>
+                    <div class="mb-3">
+                        <select name="shape" class="form-select">
+                            <option value="rectangle" [[if form_data.get('shape', 'rectangle') == 'rectangle':]]selected[[pass]]>Rectangles</option>
+                            <option value="ellipse" [[if form_data.get('shape') == 'ellipse':]]selected[[pass]]>Ellipses</option>
+                            <option value="mixed" [[if form_data.get('shape') == 'mixed':]]selected[[pass]]>Mixed</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100">Generate Sample</button>
+                </form>
+            </div>
+        </div>
+        
+        [[if error:]]
+        <div class="alert alert-danger mt-3">
+            [[=error]]
+        </div>
+        [[pass]]
+    </div>
+    
+    <div class="col-md-8">
+        [[if image_url:]]
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Generated Sample</span>
+                <span class="badge bg-info">[[=image_width]] × [[=image_height]] px</span>
+            </div>
+            <div class="card-body text-center">
+                <img src="[[=image_url]]" class="border rounded" alt="Generated Sample" style="max-width: 100%; image-rendering: pixelated;">
+            </div>
+            <div class="card-footer">
+                <div class="d-flex gap-2">
+                    <a href="[[=image_url]]" download="sample.png" class="btn btn-outline-primary flex-grow-1">
+                        Download PNG
+                    </a>
+                    <a href="[[=URL('index')]]?sample=[[=image_filename]]" class="btn btn-primary flex-grow-1">
+                        Use in Detector →
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">Feature Locations (Ground Truth)</div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 250px;">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>X</th>
+                                <th>Y</th>
+                                <th>W</th>
+                                <th>H</th>
+                                <th>Color</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [[for i, feat in enumerate(features):]]
+                            <tr>
+                                <td>[[=i+1]]</td>
+                                <td>[[=feat['x']]]</td>
+                                <td>[[=feat['y']]]</td>
+                                <td>[[=feat['w']]]</td>
+                                <td>[[=feat['h']]]</td>
+                                <td><span class="badge" style="background-color: [[=feat['color']]];">[[=feat['color']]]</span></td>
+                            </tr>
+                            [[pass]]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        [[else:]]
+        <div class="alert alert-info">
+            Configure settings and click "Generate Sample" to create a test image with random features.
+        </div>
+        <div class="card">
+            <div class="card-header">About Sample Generator</div>
+            <div class="card-body">
+                <p>This tool generates test images with known feature locations, useful for:</p>
+                <ul>
+                    <li>Testing the feature detection algorithm</li>
+                    <li>Understanding how parameters affect detection</li>
+                    <li>Generating training/validation data</li>
+                </ul>
+                <p class="mb-0">The generated features will have distinct colors from the background, making them detectable by the Delta E color difference algorithm.</p>
+            </div>
+        </div>
+        [[pass]]
+    </div>
+</div>
+
+<script>
+document.getElementById('randomColors').addEventListener('change', function() {
+    document.getElementById('featureColorPicker').style.display = this.checked ? 'none' : 'block';
+});
+</script>
