@@ -6,11 +6,18 @@ def get_outline_coordinates(x: int, y: int, w: int, h: int) -> List[Tuple[int, i
     Get list of (x, y) coordinates for the bounding box perimeter.
     Order: Top-Left -> Top-Right -> Bottom-Right -> Bottom-Left -> Top-Left(exclusive)
     """
+    # Handle degenerate cases where width or height is 1 (line-shaped boxes)
+    if w == 1:  # Vertical line
+        return [(x, y + i) for i in range(h)]
+    if h == 1:  # Horizontal line
+        return [(x + i, y) for i in range(w)]
+
+    # Standard rectangle (both dimensions >= 2)
     top = [(x + i, y) for i in range(w)]
     right = [(x + w - 1, y + i) for i in range(1, h)]
     bottom = [(x + i, y + h - 1) for i in range(w - 2, -1, -1)]
     left = [(x, y + i) for i in range(h - 2, 0, -1)]
-    
+
     return top + right + bottom + left
 
 def check_overlap_mask(mask: np.ndarray, x: int, y: int, w: int, h: int) -> bool:
