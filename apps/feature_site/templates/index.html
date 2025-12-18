@@ -7,6 +7,9 @@
     <li class="nav-item">
         <a class="nav-link" href="[[=URL('sample_generator')]]">Sample Generator</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('canvas_editor')]]">Canvas Editor</a>
+    </li>
 </ul>
 
 <div class="row">
@@ -44,6 +47,24 @@
                         <label class="form-label">Delta E Threshold</label>
                         <input type="number" step="0.1" name="threshold" class="form-control" value="[[=form_data.get('threshold', 2.3)]]">
                         <div class="form-text">CIE76 threshold (e.g. 2.3 is perceptible difference)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Edge Detection Method</label>
+                        <select name="edge_detection_method" class="form-select">
+                            [[if form_data.get('edge_detection_method', 'canny') == 'canny':]]
+                            <option value="canny" selected>Canny Edge Detection</option>
+                            [[else:]]
+                            <option value="canny">Canny Edge Detection</option>
+                            [[pass]]
+                            
+                            [[if form_data.get('edge_detection_method', 'canny') == 'sobel':]]
+                            <option value="sobel" selected>Sobel Edge Detection</option>
+                            [[else:]]
+                            <option value="sobel">Sobel Edge Detection</option>
+                            [[pass]]
+                        </select>
+                        <div class="form-text">Choose edge detection algorithm</div>
                     </div>
                     
                     <button type="submit" class="btn btn-primary w-100">Run Detection</button>
@@ -85,6 +106,20 @@
                                  draggable="false">
                         </div>
                         <div class="form-text">Drag to pan • Scroll to zoom • Double-click to reset</div>
+                        
+                        <!-- Pixel coordinate display -->
+                        <div id="pixelInfo" class="pixel-info-display mt-2 p-2 bg-light rounded border" 
+                             style="font-family: monospace; font-size: 0.9rem; display: none;">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <span class="badge bg-primary">Pixel X: <span id="pixelX">—</span></span>
+                                    <span class="badge bg-primary">Y: <span id="pixelY">—</span></span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-success">RGB: <span id="pixelRGB">—</span></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="text-nowrap">
                         <div class="bg-light rounded p-2 text-center">
@@ -96,6 +131,9 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Hidden canvas for pixel data extraction -->
+        <canvas id="pixelCanvas" style="display: none;"></canvas>
         
         <script>
         (function() {
@@ -109,6 +147,38 @@
             function updateTransform() {
                 img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
                 document.getElementById('zoomLevel').value = Math.round(scale * 100) + '%';
+            }
+            
+            function updatePixelInfo(x, y) {
+                document.getElementById('pixelX').textContent = x;
+                document.getElementById('pixelY').textContent = y;
+                
+                // Try to get pixel color from canvas
+                try {
+                    const canvas = document.getElementById('pixelCanvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Clear and draw the image to get pixel data
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(x, y, 1, 1);
+                    const data = imageData.data;
+                    const r = data[0];
+                    const g = data[1];
+                    const b = data[2];
+                    const a = data[3];
+                    
+                    if (a === 0) {
+                        document.getElementById('pixelRGB').textContent = 'transparent';
+                    } else {
+                        document.getElementById('pixelRGB').textContent = `rgb(${r}, ${g}, ${b})`;
+                    }
+                } catch (e) {
+                    // Canvas might not be available, just show coordinates
+                    document.getElementById('pixelRGB').textContent = '—';
+                }
             }
             
             function setZoomFromInput() {
@@ -189,6 +259,28 @@
             });
             
             document.addEventListener('mousemove', (e) => {
+                // Update pixel info on hover
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Check if mouse is over the container
+                if (mouseX >= 0 && mouseX < rect.width && mouseY >= 0 && mouseY < rect.height) {
+                    // Calculate actual pixel coordinates on the image
+                    const imgX = (mouseX - panX) / scale;
+                    const imgY = (mouseY - panY) / scale;
+                    
+                    // Check if within image bounds
+                    if (imgX >= 0 && imgX < img.naturalWidth && imgY >= 0 && imgY < img.naturalHeight) {
+                        updatePixelInfo(Math.floor(imgX), Math.floor(imgY));
+                        document.getElementById('pixelInfo').style.display = 'block';
+                    } else {
+                        document.getElementById('pixelInfo').style.display = 'none';
+                    }
+                } else {
+                    document.getElementById('pixelInfo').style.display = 'none';
+                }
+                
                 if (!isDragging) return;
                 panX = e.clientX - startX;
                 panY = e.clientY - startY;
@@ -198,6 +290,11 @@
             document.addEventListener('mouseup', () => {
                 isDragging = false;
                 container.style.cursor = 'grab';
+            });
+            
+            // Handle mouse leave
+            container.addEventListener('mouseleave', () => {
+                document.getElementById('pixelInfo').style.display = 'none';
             });
             
             // Scroll to zoom
@@ -250,6 +347,7 @@
                                 <th>W</th>
                                 <th>H</th>
                                 <th>Score</th>
+                                <th>Color</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -261,6 +359,16 @@
                                 <td>[[=box['w']]]</td>
                                 <td>[[=box['h']]]</td>
                                 <td>[[=f"{box['score']:.4f}"]]</td>
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        [[if box.get('color_hex'):]]
+                                        <div style="width: 24px; height: 24px; background-color: [[=box['color_hex']]]; border: 1px solid #ccc; border-radius: 3px;"></div>
+                                        <span style="font-family: monospace; font-size: 0.85rem;">[[=box['color_hex']]]</span>
+                                        [[else:]]
+                                        <span style="color: #999;">N/A</span>
+                                        [[pass]]
+                                    </div>
+                                </td>
                             </tr>
                             [[pass]]
                         </tbody>

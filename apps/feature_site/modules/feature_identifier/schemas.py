@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 @dataclass
 class BoundingBox:
@@ -9,6 +9,7 @@ class BoundingBox:
     h: int
     score: float
     validation_ratio: float
+    color_hex: Optional[str] = None  # RGB hex color, e.g., "#FF0000"
 
 @dataclass
 class DetectionResult:

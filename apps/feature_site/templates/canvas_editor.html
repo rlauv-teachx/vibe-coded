@@ -1,0 +1,451 @@
+[[extend 'layout.html']]
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('index')]]">Distinct Feature Identifier</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('sample_generator')]]">Sample Generator</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="[[=URL('canvas_editor')]]">Canvas Editor</a>
+    </li>
+</ul>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">Canvas Settings</div>
+            <div class="card-body">
+                <h6>Dimensions</h6>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small">Width (px)</label>
+                        <input type="number" id="canvasWidth" class="form-control" value="200" min="10" max="1000">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Height (px)</label>
+                        <input type="number" id="canvasHeight" class="form-control" value="200" min="10" max="1000">
+                    </div>
+                </div>
+                
+                <h6>Colors</h6>
+                <div class="mb-3">
+                    <label class="form-label small">Background Color</label>
+                    <input type="color" id="bgColor" class="form-control form-control-color w-100" value="#ffffff">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label small">Drawing Color</label>
+                    <input type="color" id="drawColor" class="form-control form-control-color w-100" value="#000000">
+                </div>
+                
+                <h6>Brush</h6>
+                <div class="mb-3">
+                    <label class="form-label small">Brush Size</label>
+                    <input type="range" id="brushSize" class="form-range" min="1" max="20" value="1">
+                    <div class="form-text" id="brushSizeDisplay">1 px</div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="gridToggle" checked>
+                        <label class="form-check-label" for="gridToggle">Show Grid</label>
+                    </div>
+                </div>
+                
+                <h6>Actions</h6>
+                <button type="button" class="btn btn-secondary w-100 mb-2" onclick="initCanvas()">Create Canvas</button>
+                <button type="button" class="btn btn-warning w-100 mb-2" onclick="clearCanvas()">Clear Canvas</button>
+                <button type="button" class="btn btn-info w-100 mb-2" onclick="downloadCanvas()">Download PNG</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">Drawing Area</div>
+            <div class="card-body">
+                <!-- Zoom controls -->
+                <div class="btn-group btn-group-sm mb-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="zoomCanvas(-1)">−</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetZoom()">Reset</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="zoomCanvas(1)">+</button>
+                    <input type="text" class="form-control form-control-sm" id="zoomLevel" 
+                           style="width: 70px; text-align: center;" value="100%">
+                </div>
+                
+                <div id="canvasContainer" class="border rounded bg-secondary bg-opacity-10" 
+                     style="height: 400px; overflow: auto; position: relative; cursor: grab;">
+                    <canvas id="drawingCanvas" style="border: 1px solid #ccc; cursor: crosshair; image-rendering: pixelated; position: absolute; top: 0; left: 0;"></canvas>
+                </div>
+                <div class="form-text">Drag to pan • Scroll to zoom • Double-click to reset</div>
+                
+                <!-- Pixel coordinate display -->
+                <div id="pixelInfo" class="pixel-info-display mt-3 p-2 bg-light rounded border" 
+                     style="font-family: monospace; font-size: 0.9rem; display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary">Pixel X: <span id="pixelX">—</span></span>
+                            <span class="badge bg-primary">Y: <span id="pixelY">—</span></span>
+                        </div>
+                        <div>
+                            <span class="badge bg-success">Current Color: <span id="pixelColor">—</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    
+    let isDrawing = false;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let startX = 0;
+    let startY = 0;
+    
+    function updateCanvasTransform() {
+        canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        document.getElementById('zoomLevel').value = Math.round(scale * 100) + '%';
+    }
+    
+    function initCanvasView() {
+        if (canvas.width === 0 || canvas.height === 0) return;
+        
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const canvasW = canvas.width;
+        const canvasH = canvas.height;
+        
+        // Fit canvas to container
+        const fitScale = Math.min(containerW / canvasW, containerH / canvasH);
+        scale = Math.max(fitScale, 1);
+        
+        // Center the canvas
+        panX = (containerW - canvasW * scale) / 2;
+        panY = (containerH - canvasH * scale) / 2;
+        
+        updateCanvasTransform();
+    }
+    
+    function zoomCanvas(dir) {
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const centerX = containerW / 2;
+        const centerY = containerH / 2;
+        
+        const oldScale = scale;
+        scale = Math.max(0.5, Math.min(20, scale * (dir > 0 ? 1.25 : 0.8)));
+        
+        panX = centerX - (centerX - panX) * (scale / oldScale);
+        panY = centerY - (centerY - panY) * (scale / oldScale);
+        updateCanvasTransform();
+    }
+    
+    function resetZoom() {
+        initCanvasView();
+    }
+    
+    function setZoomFromInput() {
+        const input = document.getElementById('zoomLevel');
+        const value = parseInt(input.value.replace('%', ''), 10);
+        if (!isNaN(value) && value >= 1 && value <= 2000) {
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight;
+            const centerX = containerW / 2;
+            const centerY = containerH / 2;
+            
+            const oldScale = scale;
+            scale = value / 100;
+            
+            panX = centerX - (centerX - panX) * (scale / oldScale);
+            panY = centerY - (centerY - panY) * (scale / oldScale);
+            updateCanvasTransform();
+        } else {
+            input.value = Math.round(scale * 100) + '%';
+        }
+    }
+    
+    // Initialize canvas on load
+    function initCanvas() {
+        const width = Math.max(10, Math.min(1000, parseInt(document.getElementById('canvasWidth').value)));
+        const height = Math.max(10, Math.min(1000, parseInt(document.getElementById('canvasHeight').value)));
+        const bgColor = document.getElementById('bgColor').value;
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Fill with background color
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+        
+        initCanvasView();
+        updateGridDisplay();
+    }
+    
+    function updateGridDisplay() {
+        const showGrid = document.getElementById('gridToggle').checked;
+        if (showGrid && canvas.width > 0 && canvas.height > 0) {
+            drawGrid();
+        }
+    }
+    
+    function drawGrid() {
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+        ctx.lineWidth = 0.5;
+        
+        // Draw vertical lines
+        for (let x = 1; x < width; x++) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+        
+        // Draw horizontal lines
+        for (let y = 1; y < height; y++) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+    }
+    
+    function clearCanvas() {
+        if (confirm('Clear the entire canvas?')) {
+            const bgColor = document.getElementById('bgColor').value;
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            updateGridDisplay();
+        }
+    }
+    
+    function downloadCanvas() {
+        if (canvas.width === 0 || canvas.height === 0) {
+            alert('Create a canvas first');
+            return;
+        }
+        const link = document.createElement('a');
+        link.download = 'canvas_drawing.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+    
+    function getPixelColor(x, y) {
+        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+            return null;
+        }
+        const imageData = ctx.getImageData(x, y, 1, 1);
+        const data = imageData.data;
+        return {
+            r: data[0],
+            g: data[1],
+            b: data[2],
+            a: data[3],
+            hex: '#' + [data[0], data[1], data[2]].map(x => x.toString(16).padStart(2, '0').toUpperCase()).join('')
+        };
+    }
+    
+    function updatePixelInfo(x, y) {
+        document.getElementById('pixelX').textContent = x;
+        document.getElementById('pixelY').textContent = y;
+        
+        const color = getPixelColor(x, y);
+        if (color) {
+            document.getElementById('pixelColor').textContent = color.hex;
+        } else {
+            document.getElementById('pixelColor').textContent = '—';
+        }
+    }
+    
+    function drawSolidPixels(x1, y1, x2, y2) {
+        if (!isDrawing || canvas.width === 0 || canvas.height === 0) return;
+        
+        const color = document.getElementById('drawColor').value;
+        const brushSize = parseInt(document.getElementById('brushSize').value);
+        
+        // Bresenham's line algorithm to draw solid pixels
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        const sx = x1 < x2 ? 1 : -1;
+        const sy = y1 < y2 ? 1 : -1;
+        let err = dx - dy;
+        let x = x1;
+        let y = y1;
+        
+        ctx.fillStyle = color;
+        
+        // Draw line of solid pixels
+        while (true) {
+            // Draw solid square brush at current position
+            const offset = Math.floor(brushSize / 2);
+            ctx.fillRect(x - offset, y - offset, brushSize, brushSize);
+            
+            if (x === x2 && y === y2) break;
+            
+            const e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y += sy;
+            }
+        }
+        
+        if (document.getElementById('gridToggle').checked) {
+            drawGrid();
+        }
+    }
+    
+    // Mouse events
+    container.addEventListener('mousedown', (e) => {
+        if (canvas.width === 0) return;
+        
+        // Check if mouse is over canvas
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        if (x >= 0 && x < rect.width && y >= 0 && y < rect.height) {
+            isDrawing = true;
+        } else {
+            isDragging = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+            container.style.cursor = 'grabbing';
+        }
+        
+        lastX = x;
+        lastY = y;
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Update pixel info on hover
+        if (x >= 0 && x < rect.width && y >= 0 && y < rect.height && canvas.width > 0) {
+            const imgX = Math.floor(x * canvas.width / rect.width);
+            const imgY = Math.floor(y * canvas.height / rect.height);
+            
+            if (imgX >= 0 && imgX < canvas.width && imgY >= 0 && imgY < canvas.height) {
+                updatePixelInfo(imgX, imgY);
+                document.getElementById('pixelInfo').style.display = 'block';
+            } else {
+                document.getElementById('pixelInfo').style.display = 'none';
+            }
+        } else {
+            document.getElementById('pixelInfo').style.display = 'none';
+        }
+        
+        if (isDrawing && canvas.width > 0) {
+            const imgX1 = Math.floor(lastX * canvas.width / rect.width);
+            const imgY1 = Math.floor(lastY * canvas.height / rect.height);
+            const imgX2 = Math.floor(x * canvas.width / rect.width);
+            const imgY2 = Math.floor(y * canvas.height / rect.height);
+            
+            drawSolidPixels(imgX1, imgY1, imgX2, imgY2);
+            lastX = x;
+            lastY = y;
+        }
+        
+        if (isDragging) {
+            panX = e.clientX - startX;
+            panY = e.clientY - startY;
+            updateCanvasTransform();
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDrawing = false;
+        isDragging = false;
+        container.style.cursor = 'grab';
+    });
+    
+    container.addEventListener('mouseleave', () => {
+        isDrawing = false;
+        isDragging = false;
+        container.style.cursor = 'grab';
+        document.getElementById('pixelInfo').style.display = 'none';
+    });
+    
+    // Scroll to zoom
+    container.addEventListener('wheel', (e) => {
+        if (canvas.width === 0) return;
+        e.preventDefault();
+        
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        const oldScale = scale;
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale = Math.max(0.5, Math.min(20, scale * delta));
+        
+        // Zoom toward mouse position
+        panX = mouseX - (mouseX - panX) * (scale / oldScale);
+        panY = mouseY - (mouseY - panY) * (scale / oldScale);
+        updateCanvasTransform();
+    });
+    
+    // Double-click to reset zoom
+    container.addEventListener('dblclick', resetZoom);
+    
+    // Update brush size display
+    document.getElementById('brushSize').addEventListener('change', (e) => {
+        document.getElementById('brushSizeDisplay').textContent = e.target.value + ' px';
+    });
+    
+    // Grid toggle
+    document.getElementById('gridToggle').addEventListener('change', () => {
+        if (canvas.width > 0 && canvas.height > 0) {
+            updateGridDisplay();
+        }
+    });
+    
+    // Background color change - clear and refill
+    document.getElementById('bgColor').addEventListener('change', () => {
+        if (canvas.width > 0) {
+            const bgColor = document.getElementById('bgColor').value;
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            updateGridDisplay();
+        }
+    });
+    
+    // Zoom input field - Enter to apply, blur to apply
+    const zoomInput = document.getElementById('zoomLevel');
+    zoomInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            setZoomFromInput();
+            zoomInput.blur();
+        }
+    });
+    zoomInput.addEventListener('blur', setZoomFromInput);
+    
+    // Expose functions globally
+    window.initCanvas = initCanvas;
+    window.clearCanvas = clearCanvas;
+    window.downloadCanvas = downloadCanvas;
+    window.zoomCanvas = zoomCanvas;
+    window.resetZoom = resetZoom;
+})();
+</script>

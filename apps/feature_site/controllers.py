@@ -15,8 +15,89 @@ from .modules.feature_identifier.overlay import create_overlay_image
 @action('index', method=['GET', 'POST'])
 @action.uses('index.html', session, T)
 def index():
-    # Handle GET - show empty form
+    # Handle GET - show empty form (or process sample if provided)
     if request.method == 'GET':
+        sample_filename = request.params.get('sample')
+        
+        # If a sample image was provided, automatically process it
+        if sample_filename:
+            try:
+                # Validate filename to prevent path traversal
+                if '..' in sample_filename or '/' in sample_filename or '\\' in sample_filename:
+                    raise ValueError("Invalid filename")
+                
+                file_path = os.path.join(UPLOADS_FOLDER, sample_filename)
+                
+                # Verify file exists and is within uploads folder
+                if not os.path.abspath(file_path).startswith(os.path.abspath(UPLOADS_FOLDER)):
+                    raise ValueError("Invalid file path")
+                if not os.path.exists(file_path):
+                    raise ValueError("File not found")
+                
+                # Use default parameters for sample processing
+                min_w, max_w = 0, 10000
+                min_h, max_h = 0, 10000
+                threshold = 2.3
+                edge_detection_method = 'canny'
+                
+                # Process
+                detection_result = detect_features(
+                    file_path,
+                    min_w, max_w, min_h, max_h,
+                    threshold,
+                    edge_detection_method
+                )
+                
+                # Generate overlay
+                original_image = cv2.imread(file_path)
+                img_height, img_width = original_image.shape[:2]
+                overlay_image = create_overlay_image(original_image, detection_result.bounding_boxes)
+                
+                overlay_filename = f"overlay_{sample_filename}"
+                overlay_path = os.path.join(UPLOADS_FOLDER, overlay_filename)
+                cv2.imwrite(overlay_path, overlay_image)
+                
+                # Serialize result for display/download
+                results_dict = {
+                    "bounding_boxes": [
+                        {"x": b.x, "y": b.y, "w": b.w, "h": b.h, "score": b.score, "validation_ratio": b.validation_ratio, "color_hex": b.color_hex}
+                        for b in detection_result.bounding_boxes
+                    ],
+                    "delta_e_method": detection_result.delta_e_method,
+                    "delta_e_threshold": detection_result.delta_e_threshold,
+                    "processing_time_ms": detection_result.processing_time_ms
+                }
+                
+                return dict(
+                    results=results_dict,
+                    error=None,
+                    image_url=URL('uploads', sample_filename),
+                    overlay_url=URL('uploads', overlay_filename),
+                    json_data=json.dumps(results_dict, indent=2),
+                    image_width=img_width,
+                    image_height=img_height,
+                    form_data={
+                        'min_w': min_w, 'max_w': max_w,
+                        'min_h': min_h, 'max_h': max_h,
+                        'threshold': threshold,
+                        'edge_detection_method': edge_detection_method
+                    }
+                )
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return dict(
+                    error=f"Error processing sample: {str(e)}",
+                    results=None,
+                    image_url=None,
+                    overlay_url=None,
+                    json_data=None,
+                    image_width=None,
+                    image_height=None,
+                    form_data={}
+                )
+        
+        # No sample provided, show empty form
         return dict(
             results=None,
             error=None,
@@ -35,6 +116,7 @@ def index():
         min_h = int(request.forms.get('min_h', 0))
         max_h = int(request.forms.get('max_h', 10000))
         threshold = float(request.forms.get('threshold', 2.3)) # Default CIE76 threshold often around 2.3
+        edge_detection_method = request.forms.get('edge_detection_method', 'canny')
         
         uploaded_file = request.files.get('image')
         
@@ -56,7 +138,8 @@ def index():
         detection_result = detect_features(
             file_path,
             min_w, max_w, min_h, max_h,
-            threshold
+            threshold,
+            edge_detection_method
         )
         
         # Generate overlay
@@ -72,7 +155,7 @@ def index():
         # Convert dataclass to dict
         results_dict = {
             "bounding_boxes": [
-                {"x": b.x, "y": b.y, "w": b.w, "h": b.h, "score": b.score, "validation_ratio": b.validation_ratio}
+                {"x": b.x, "y": b.y, "w": b.w, "h": b.h, "score": b.score, "validation_ratio": b.validation_ratio, "color_hex": b.color_hex}
                 for b in detection_result.bounding_boxes
             ],
             "delta_e_method": detection_result.delta_e_method,
@@ -91,7 +174,8 @@ def index():
             form_data={
                 'min_w': min_w, 'max_w': max_w,
                 'min_h': min_h, 'max_h': max_h,
-                'threshold': threshold
+                'threshold': threshold,
+                'edge_detection_method': edge_detection_method
             }
         )
         
@@ -218,6 +302,13 @@ def sample_generator():
         import traceback
         traceback.print_exc()
         return dict(error=str(e), image_url=None, image_filename=None, image_width=None, image_height=None, features=[], form_data={})
+
+# Canvas editor
+@action('canvas_editor', method=['GET'])
+@action.uses('canvas_editor.html', session, T)
+def canvas_editor():
+    # GET - show empty canvas editor
+    return dict()
 
 # Serve uploads
 @action('uploads/<filename>')

@@ -6,3 +6,33 @@
     object-fit: contain;
 }
 
+/* Pixel info display styling */
+.pixel-info-display {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    animation: slideInUp 0.2s ease-out;
+}
+
+.pixel-info-display .badge {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.pixel-info-display .badge span {
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
