@@ -58,6 +58,7 @@
                 <button type="button" class="btn btn-secondary w-100 mb-2" onclick="initCanvas()">Create Canvas</button>
                 <button type="button" class="btn btn-warning w-100 mb-2" onclick="clearCanvas()">Clear Canvas</button>
                 <button type="button" class="btn btn-info w-100 mb-2" onclick="downloadCanvas()">Download PNG</button>
+                <button type="button" class="btn btn-success w-100 mb-2" onclick="saveCanvasDrawing()">Save Drawing</button>
             </div>
         </div>
     </div>
@@ -94,6 +95,14 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Drawing history -->
+                <div id="drawingHistorySection" style="display: none; margin-top: 15px;">
+                    <hr>
+                    <h6>Drawing History</h6>
+                    <div id="drawingHistory" class="d-flex flex-column gap-2" style="max-height: 200px; overflow-y: auto;">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -114,6 +123,7 @@
     let panY = 0;
     let startX = 0;
     let startY = 0;
+    let drawingHistory = [];
     
     function updateCanvasTransform() {
         canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
@@ -245,6 +255,109 @@
         link.click();
     }
     
+    function saveCanvasDrawing() {
+        if (canvas.width === 0 || canvas.height === 0) {
+            alert('Create a canvas first');
+            return;
+        }
+        
+        // Get canvas data URL
+        const canvasData = canvas.toDataURL('image/png');
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('canvas_data', canvasData);
+        formData.append('canvas_width', canvas.width);
+        formData.append('canvas_height', canvas.height);
+        
+        // Send to server
+        fetch('[[=URL("canvas_editor")]]', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Drawing saved successfully!');
+                // Add to local history
+                drawingHistory = data.drawing_history || [];
+                updateHistoryDisplay();
+            } else {
+                alert('Error saving drawing: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving drawing: ' + error.message);
+        });
+    }
+    
+    function loadDrawing(canvasDataUrl) {
+        if (canvas.width === 0 || canvas.height === 0) {
+            alert('Create a canvas first');
+            return;
+        }
+        
+        const img = new Image();
+        img.onload = function() {
+            // Clear the canvas with background color
+            const bgColor = document.getElementById('bgColor').value;
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw the loaded image
+            ctx.drawImage(img, 0, 0);
+            
+            // Redraw grid if enabled
+            updateGridDisplay();
+        };
+        img.src = canvasDataUrl;
+    }
+    
+    function updateHistoryDisplay() {
+        const historyContainer = document.getElementById('drawingHistory');
+        const historySection = document.getElementById('drawingHistorySection');
+        
+        if (drawingHistory.length === 0) {
+            historySection.style.display = 'none';
+            return;
+        }
+        
+        historySection.style.display = 'block';
+        historyContainer.innerHTML = '';
+        
+        drawingHistory.forEach((item, index) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-secondary text-start';
+            btn.style.whiteSpace = 'normal';
+            btn.style.textAlign = 'left';
+            btn.style.padding = '0.5rem';
+            
+            const timestamp = new Date();
+            btn.innerHTML = `
+                <div class="small">
+                    <div class="text-truncate font-monospace">Drawing ${index + 1}</div>
+                    <div class="text-muted small">${item.canvas_width}×${item.canvas_height} px</div>
+                </div>
+            `;
+            
+            btn.onclick = () => {
+                if (confirm('Load this drawing? Current drawing will be lost.')) {
+                    loadDrawing(item.canvas_data);
+                }
+            };
+            
+            historyContainer.appendChild(btn);
+        });
+    }
+    
+    // Fetch initial history from page load
+    function loadInitialHistory() {
+        // For now, we'll load history on demand when page loads
+        // This will be updated via AJAX when drawings are saved
+    }
+    
     function getPixelColor(x, y) {
         if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
             return null;
@@ -308,9 +421,6 @@
             }
         }
         
-        if (document.getElementById('gridToggle').checked) {
-            drawGrid();
-        }
     }
     
     // Mouse events
@@ -445,6 +555,8 @@
     window.initCanvas = initCanvas;
     window.clearCanvas = clearCanvas;
     window.downloadCanvas = downloadCanvas;
+    window.saveCanvasDrawing = saveCanvasDrawing;
+    window.loadDrawing = loadDrawing;
     window.zoomCanvas = zoomCanvas;
     window.resetZoom = resetZoom;
 })();

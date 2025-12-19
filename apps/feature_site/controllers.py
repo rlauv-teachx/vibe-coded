@@ -4,6 +4,7 @@ import random
 import cv2
 import json
 import numpy as np
+import base64
 from py4web import action, request, response, abort, redirect, URL
 from ombott import static_file
 from .common import session, T, cache, url_signer
@@ -15,6 +16,10 @@ from .modules.feature_identifier.overlay import create_overlay_image
 @action('index', method=['GET', 'POST'])
 @action.uses('index.html', session, T)
 def index():
+    # Initialize session storage for history if not exists
+    if 'feature_identifier_history' not in session:
+        session['feature_identifier_history'] = []
+    
     # Handle GET - show empty form (or process sample if provided)
     if request.method == 'GET':
         sample_filename = request.params.get('sample')
@@ -68,6 +73,27 @@ def index():
                     "processing_time_ms": detection_result.processing_time_ms
                 }
                 
+                # Add to history
+                history_item = {
+                    'image_filename': sample_filename,
+                    'overlay_filename': overlay_filename,
+                    'image_width': img_width,
+                    'image_height': img_height,
+                    'results': results_dict,
+                    'form_data': {
+                        'min_w': min_w, 'max_w': max_w,
+                        'min_h': min_h, 'max_h': max_h,
+                        'threshold': threshold,
+                        'edge_detection_method': edge_detection_method
+                    },
+                    'timestamp': str(uuid.uuid4())
+                }
+                
+                # Prepend to history (most recent first)
+                session['feature_identifier_history'].insert(0, history_item)
+                # Keep only last 20 items
+                session['feature_identifier_history'] = session['feature_identifier_history'][:20]
+                
                 return dict(
                     results=results_dict,
                     error=None,
@@ -81,7 +107,8 @@ def index():
                         'min_h': min_h, 'max_h': max_h,
                         'threshold': threshold,
                         'edge_detection_method': edge_detection_method
-                    }
+                    },
+                    history=session['feature_identifier_history']
                 )
             except Exception as e:
                 import traceback
@@ -94,7 +121,8 @@ def index():
                     json_data=None,
                     image_width=None,
                     image_height=None,
-                    form_data={}
+                    form_data={},
+                    history=session['feature_identifier_history']
                 )
         
         # No sample provided, show empty form
@@ -106,7 +134,8 @@ def index():
             json_data=None,
             image_width=None,
             image_height=None,
-            form_data={}
+            form_data={},
+            history=session['feature_identifier_history']
         )
     
     # Handle POST - process the image
@@ -121,13 +150,13 @@ def index():
         uploaded_file = request.files.get('image')
         
         if not uploaded_file:
-            return dict(error="No file uploaded", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={})
+            return dict(error="No file uploaded", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={}, history=session['feature_identifier_history'])
             
         # Validate file
         filename = uploaded_file.filename
         ext = os.path.splitext(filename)[1].lower()
         if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
-             return dict(error="Invalid file type", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={})
+             return dict(error="Invalid file type", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={}, history=session['feature_identifier_history'])
              
         # Save file
         safe_filename = f"{uuid.uuid4()}{ext}"
@@ -163,6 +192,27 @@ def index():
             "processing_time_ms": detection_result.processing_time_ms
         }
         
+        # Add to history
+        history_item = {
+            'image_filename': safe_filename,
+            'overlay_filename': overlay_filename,
+            'image_width': img_width,
+            'image_height': img_height,
+            'results': results_dict,
+            'form_data': {
+                'min_w': min_w, 'max_w': max_w,
+                'min_h': min_h, 'max_h': max_h,
+                'threshold': threshold,
+                'edge_detection_method': edge_detection_method
+            },
+            'timestamp': str(uuid.uuid4())
+        }
+        
+        # Prepend to history (most recent first)
+        session['feature_identifier_history'].insert(0, history_item)
+        # Keep only last 20 items
+        session['feature_identifier_history'] = session['feature_identifier_history'][:20]
+        
         return dict(
             results=results_dict,
             error=None,
@@ -176,18 +226,23 @@ def index():
                 'min_h': min_h, 'max_h': max_h,
                 'threshold': threshold,
                 'edge_detection_method': edge_detection_method
-            }
+            },
+            history=session['feature_identifier_history']
         )
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return dict(error=str(e), results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={})
+        return dict(error=str(e), results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data={}, history=session['feature_identifier_history'])
 
 # Sample image generator
 @action('sample_generator', method=['GET', 'POST'])
 @action.uses('sample_generator.html', session, T)
 def sample_generator():
+    # Initialize session storage for history if not exists
+    if 'sample_generator_history' not in session:
+        session['sample_generator_history'] = []
+    
     # Handle GET - show empty form
     if request.method == 'GET':
         return dict(
@@ -197,7 +252,8 @@ def sample_generator():
             image_width=None,
             image_height=None,
             features=[],
-            form_data={}
+            form_data={},
+            history=session['sample_generator_history']
         )
     
     # Handle POST - generate sample image
@@ -280,6 +336,29 @@ def sample_generator():
         file_path = os.path.join(UPLOADS_FOLDER, filename)
         cv2.imwrite(file_path, image)
         
+        # Add to history
+        history_item = {
+            'image_filename': filename,
+            'image_width': img_width,
+            'image_height': img_height,
+            'features': features,
+            'form_data': {
+                'img_width': img_width, 'img_height': img_height,
+                'num_features': num_features,
+                'min_size': min_size, 'max_size': max_size,
+                'bg_color': bg_color_hex,
+                'random_colors': random_colors,
+                'feature_color': feature_color_hex,
+                'shape': shape
+            },
+            'timestamp': str(uuid.uuid4())
+        }
+        
+        # Prepend to history (most recent first)
+        session['sample_generator_history'].insert(0, history_item)
+        # Keep only last 20 items
+        session['sample_generator_history'] = session['sample_generator_history'][:20]
+        
         return dict(
             error=None,
             image_url=URL('uploads', filename),
@@ -295,20 +374,55 @@ def sample_generator():
                 'random_colors': random_colors,
                 'feature_color': feature_color_hex,
                 'shape': shape
-            }
+            },
+            history=session['sample_generator_history']
         )
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return dict(error=str(e), image_url=None, image_filename=None, image_width=None, image_height=None, features=[], form_data={})
+        return dict(error=str(e), image_url=None, image_filename=None, image_width=None, image_height=None, features=[], form_data={}, history=session['sample_generator_history'])
 
 # Canvas editor
-@action('canvas_editor', method=['GET'])
+@action('canvas_editor', method=['GET', 'POST'])
 @action.uses('canvas_editor.html', session, T)
 def canvas_editor():
-    # GET - show empty canvas editor
-    return dict()
+    # Initialize session storage for drawing history if not exists
+    if 'canvas_drawings' not in session:
+        session['canvas_drawings'] = []
+    
+    # GET - show canvas editor with history
+    if request.method == 'GET':
+        return dict(drawing_history=session['canvas_drawings'])
+    
+    # POST - save drawing
+    try:
+        canvas_data = request.forms.get('canvas_data')
+        canvas_width = int(request.forms.get('canvas_width', 200))
+        canvas_height = int(request.forms.get('canvas_height', 200))
+        
+        if not canvas_data:
+            return dict(success=False, error="No canvas data provided")
+        
+        # Save the drawing with metadata
+        drawing_item = {
+            'canvas_data': canvas_data,
+            'canvas_width': canvas_width,
+            'canvas_height': canvas_height,
+            'timestamp': str(uuid.uuid4())
+        }
+        
+        # Prepend to history
+        session['canvas_drawings'].insert(0, drawing_item)
+        # Keep only last 20 items
+        session['canvas_drawings'] = session['canvas_drawings'][:20]
+        
+        return dict(success=True, drawing_id=drawing_item['timestamp'], drawing_history=session['canvas_drawings'])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return dict(success=False, error=str(e))
 
 # Serve uploads
 @action('uploads/<filename>')

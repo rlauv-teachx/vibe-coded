@@ -77,6 +77,33 @@
             [[=error]]
         </div>
         [[pass]]
+        
+        [[if history:]]
+        <div class="card mt-3">
+            <div class="card-header">Saved Images History</div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                [[if len(history) > 0:]]
+                <div class="d-flex flex-column gap-2">
+                    [[for item in history:]]
+                    <a href="[[=URL('index')]]?sample=[[=item['image_filename']]]" 
+                       class="btn btn-sm btn-outline-secondary text-start" 
+                       style="white-space: normal; text-align: left; padding: 0.5rem;">
+                        <div class="small font-monospace">
+                            <div class="text-truncate">[[=item['image_filename']]]</div>
+                            <div class="text-muted small">
+                                [[=item['image_width']]]×[[=item['image_height']]] | 
+                                [[=len(item['results']['bounding_boxes'])]] features
+                            </div>
+                        </div>
+                    </a>
+                    [[pass]]
+                </div>
+                [[else:]]
+                <p class="text-muted small mb-0">No saved images yet. Run a detection to add to history.</p>
+                [[pass]]
+            </div>
+        </div>
+        [[pass]]
     </div>
     
     <div class="col-md-8">
