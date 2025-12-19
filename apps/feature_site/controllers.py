@@ -20,6 +20,13 @@ def index():
     if 'feature_identifier_history' not in session:
         session['feature_identifier_history'] = []
     
+    if 'canvas_drawings' in session:
+        cleaned_drawings = []
+        for item in session['canvas_drawings']:
+            if 'canvas_filename' in item and 'canvas_data' not in item:
+                cleaned_drawings.append(item)
+        session['canvas_drawings'] = cleaned_drawings
+    
     # Handle GET - show empty form (or process sample if provided)
     if request.method == 'GET':
         sample_filename = request.params.get('sample')
@@ -239,9 +246,15 @@ def index():
 @action('sample_generator', method=['GET', 'POST'])
 @action.uses('sample_generator.html', session, T)
 def sample_generator():
-    # Initialize session storage for history if not exists
     if 'sample_generator_history' not in session:
         session['sample_generator_history'] = []
+    
+    if 'canvas_drawings' in session:
+        cleaned_drawings = []
+        for item in session['canvas_drawings']:
+            if 'canvas_filename' in item and 'canvas_data' not in item:
+                cleaned_drawings.append(item)
+        session['canvas_drawings'] = cleaned_drawings
     
     # Handle GET - show empty form
     if request.method == 'GET':
@@ -391,9 +404,25 @@ def canvas_editor():
     if 'canvas_drawings' not in session:
         session['canvas_drawings'] = []
     
+    cleaned_drawings = []
+    for item in session['canvas_drawings']:
+        if 'canvas_filename' in item and 'canvas_data' not in item:
+            cleaned_drawings.append(item)
+    session['canvas_drawings'] = cleaned_drawings
+    
     # GET - show canvas editor with history
     if request.method == 'GET':
-        return dict(drawing_history=session['canvas_drawings'])
+        # Build history with URLs for display
+        history_with_urls = []
+        for item in session['canvas_drawings']:
+            history_with_urls.append({
+                'canvas_filename': item['canvas_filename'],
+                'canvas_url': URL('uploads', item['canvas_filename']),
+                'canvas_width': item['canvas_width'],
+                'canvas_height': item['canvas_height'],
+                'timestamp': item['timestamp']
+            })
+        return dict(drawing_history=history_with_urls)
     
     # POST - save drawing
     try:
@@ -404,9 +433,19 @@ def canvas_editor():
         if not canvas_data:
             return dict(success=False, error="No canvas data provided")
         
-        # Save the drawing with metadata
+        if ',' in canvas_data:
+            base64_data = canvas_data.split(',', 1)[1]
+        else:
+            base64_data = canvas_data
+        
+        image_bytes = base64.b64decode(base64_data)
+        filename = f"canvas_{uuid.uuid4()}.png"
+        file_path = os.path.join(UPLOADS_FOLDER, filename)
+        with open(file_path, 'wb') as f:
+            f.write(image_bytes)
+        
         drawing_item = {
-            'canvas_data': canvas_data,
+            'canvas_filename': filename,
             'canvas_width': canvas_width,
             'canvas_height': canvas_height,
             'timestamp': str(uuid.uuid4())
@@ -417,12 +456,32 @@ def canvas_editor():
         # Keep only last 20 items
         session['canvas_drawings'] = session['canvas_drawings'][:20]
         
-        return dict(success=True, drawing_id=drawing_item['timestamp'], drawing_history=session['canvas_drawings'])
+        history_with_urls = []
+        for item in session['canvas_drawings']:
+            history_with_urls.append({
+                'canvas_filename': item['canvas_filename'],
+                'canvas_url': URL('uploads', item['canvas_filename']),
+                'canvas_width': item['canvas_width'],
+                'canvas_height': item['canvas_height'],
+                'timestamp': item['timestamp']
+            })
+        
+        return dict(success=True, drawing_id=drawing_item['timestamp'], drawing_history=history_with_urls)
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return dict(success=False, error=str(e))
+        history_with_urls = []
+        for item in session.get('canvas_drawings', []):
+            if 'canvas_filename' in item:  # Only include new-format items
+                history_with_urls.append({
+                    'canvas_filename': item['canvas_filename'],
+                    'canvas_url': URL('uploads', item['canvas_filename']),
+                    'canvas_width': item['canvas_width'],
+                    'canvas_height': item['canvas_height'],
+                    'timestamp': item['timestamp']
+                })
+        return dict(success=False, error=str(e), drawing_history=history_with_urls)
 
 # Serve uploads
 @action('uploads/<filename>')

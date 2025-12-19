@@ -107,7 +107,7 @@
             </div>
         </div>
         
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">Feature Locations (Ground Truth)</div>
             <div class="card-body">
                 <div class="table-responsive" style="max-height: 250px;">
@@ -142,7 +142,7 @@
         <div class="alert alert-info">
             Configure settings and click "Generate Sample" to create a test image with random features.
         </div>
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">About Sample Generator</div>
             <div class="card-body">
                 <p>This tool generates test images with known feature locations, useful for:</p>
@@ -152,21 +152,32 @@
                     <li>Generating training/validation data</li>
                 </ul>
                 <p>The generated features will have distinct colors from the background, making them detectable by the Delta E color difference algorithm.</p>
-                
-                [[if history:]]
-                <hr>
-                <h6>Generated Samples History</h6>
+            </div>
+        </div>
+        [[pass]]
+        
+        [[if history:]]
+        <div class="card">
+            <div class="card-header">Generated Samples History</div>
+            <div class="card-body">
                 [[if len(history) > 0:]]
-                <div class="d-flex flex-column gap-2" style="max-height: 300px; overflow-y: auto;">
+                <div class="d-flex flex-wrap gap-3" style="max-height: 350px; overflow-y: auto;">
                     [[for item in history:]]
                     <a href="[[=URL('index')]]?sample=[[=item['image_filename']]]" 
-                       class="btn btn-sm btn-outline-secondary text-start" 
-                       style="white-space: normal; text-align: left; padding: 0.5rem;">
-                        <div class="small font-monospace">
-                            <div class="text-truncate">[[=item['image_filename']]]</div>
-                            <div class="text-muted small">
-                                [[=item['image_width']]]×[[=item['image_height']]] | 
-                                [[=len(item['features'])]] features
+                       class="text-decoration-none" 
+                       style="width: 120px;">
+                        <div class="card h-100">
+                            <img src="[[=URL('uploads', item['image_filename'])]]" 
+                                 class="card-img-top border-bottom" 
+                                 alt="Sample" 
+                                 style="height: 80px; object-fit: contain; background: #f8f9fa; image-rendering: pixelated;">
+                            <div class="card-body p-2 text-center">
+                                <div class="text-muted small">
+                                    [[=item['image_width']]]×[[=item['image_height']]]
+                                </div>
+                                <div class="text-muted small">
+                                    [[=len(item['features'])]] features
+                                </div>
                             </div>
                         </div>
                     </a>
@@ -174,7 +185,6 @@
                 </div>
                 [[else:]]
                 <p class="text-muted small mb-0">No generated samples yet. Create one to add to history.</p>
-                [[pass]]
                 [[pass]]
             </div>
         </div>
