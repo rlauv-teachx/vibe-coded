@@ -1,422 +1,114 @@
 [[extend 'layout.html']]
 
-<ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <a class="nav-link active" href="[[=URL('index')]]">Distinct Feature Identifier</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="[[=URL('sample_generator')]]">Sample Generator</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="[[=URL('canvas_editor')]]">Canvas Editor</a>
-    </li>
-</ul>
+<div class="py-5 text-center">
+    <h1 class="display-4 fw-bold">Image Processing Hub</h1>
+    <p class="lead">Select a feature to get started</p>
+</div>
 
-<div class="row">
+<div class="row g-4 justify-content-center">
+    <!-- Feature Identifier -->
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">Configuration</div>
-            <div class="card-body">
-                <form action="[[=URL('index')]]" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label class="form-label">Image</label>
-                        <input type="file" name="image" class="form-control" required accept=".jpg,.jpeg,.png,.webp">
-                    </div>
-                    
-                    <h6 class="mt-3">Expected Dimensions</h6>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label small">Min Width</label>
-                            <input type="number" name="min_w" class="form-control" value="[[=form_data.get('min_w', 10)]]">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Max Width</label>
-                            <input type="number" name="max_w" class="form-control" value="[[=form_data.get('max_w', 500)]]">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Min Height</label>
-                            <input type="number" name="min_h" class="form-control" value="[[=form_data.get('min_h', 10)]]">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Max Height</label>
-                            <input type="number" name="max_h" class="form-control" value="[[=form_data.get('max_h', 500)]]">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3 mt-3">
-                        <label class="form-label">Delta E Threshold</label>
-                        <input type="number" step="0.1" name="threshold" class="form-control" value="[[=form_data.get('threshold', 2.3)]]">
-                        <div class="form-text">CIE76 threshold (e.g. 2.3 is perceptible difference)</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Edge Detection Method</label>
-                        <select name="edge_detection_method" class="form-select">
-                            [[if form_data.get('edge_detection_method', 'canny') == 'canny':]]
-                            <option value="canny" selected>Canny Edge Detection</option>
-                            [[else:]]
-                            <option value="canny">Canny Edge Detection</option>
-                            [[pass]]
-                            
-                            [[if form_data.get('edge_detection_method', 'canny') == 'sobel':]]
-                            <option value="sobel" selected>Sobel Edge Detection</option>
-                            [[else:]]
-                            <option value="sobel">Sobel Edge Detection</option>
-                            [[pass]]
-                        </select>
-                        <div class="form-text">Choose edge detection algorithm</div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary w-100">Run Detection</button>
-                </form>
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body text-center p-4">
+                <div class="display-1 mb-3 text-primary">🔍</div>
+                <h3 class="card-title h4">Feature Identifier</h3>
+                <p class="card-text text-muted">Detect and analyze distinct visual features in uploaded images using Canny or Sobel edge detection.</p>
+                <a href="[[=URL('feature_identifier')]]" class="btn btn-primary mt-auto">Open Tool</a>
             </div>
         </div>
-        
-        [[if error:]]
-        <div class="alert alert-danger mt-3">
-            [[=error]]
+    </div>
+
+    <!-- Sample Generator -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body text-center p-4">
+                <div class="display-1 mb-3 text-success">🎨</div>
+                <h3 class="card-title h4">Sample Generator</h3>
+                <p class="card-text text-muted">Generate synthetic training images with customizable shapes, sizes, and colors for testing detection algorithms.</p>
+                <a href="[[=URL('sample_generator')]]" class="btn btn-success mt-auto">Open Tool</a>
+            </div>
         </div>
-        [[pass]]
-        
-        [[if history:]]
-        <div class="card mt-3">
-            <div class="card-header">Saved Images History</div>
-            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                [[if len(history) > 0:]]
-                <div class="d-flex flex-column gap-2">
-                    [[for item in history:]]
-                    <a href="[[=URL('index')]]?sample=[[=item['image_filename']]]" 
-                       class="btn btn-sm btn-outline-secondary text-start p-1" 
-                       style="white-space: normal;"
-                       title="[[=item['image_filename']]]">
+    </div>
+
+    <!-- Canvas Editor -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body text-center p-4">
+                <div class="display-1 mb-3 text-info">🖌️</div>
+                <h3 class="card-title h4">Canvas Editor</h3>
+                <p class="card-text text-muted">Draw custom shapes manually on a canvas and export them for processing in the detector.</p>
+                <a href="[[=URL('canvas_editor')]]" class="btn btn-info mt-auto">Open Tool</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card { transition: transform 0.2s; }
+    .card:hover { transform: translateY(-5px); }
+</style>
+
+<div class="mt-5 pt-4 border-top">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3">System Activity</h2>
+        <div class="d-flex gap-2">
+            <form action="[[=URL('populate_demo')]]" method="POST">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Populate Demo Data</button>
+            </form>
+            <form action="[[=URL('clear_history')]]" method="POST">
+                <button type="submit" class="btn btn-outline-danger btn-sm">Clear All History</button>
+            </form>
+        </div>
+    </div>
+
+    [[if history:]]
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Source</th>
+                    <th>Resolution</th>
+                    <th>Detection Info</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                [[for item in history:]]
+                <tr>
+                    <td>
                         <div class="d-flex align-items-center gap-2">
-                            <img src="[[=URL('uploads', item['image_filename'])]]" 
-                                 alt="Thumbnail" 
-                                 style="width: 60px; height: 60px; object-fit: cover; background: #f8f9fa; border-radius: 4px; image-rendering: pixelated;">
-                            <div class="small flex-grow-1">
-                                <div class="fw-bold">[[=item['image_width']]] × [[=item['image_height']]] px</div>
-                                <div class="text-muted small">
-                                    [[=item['num_features']]] features found
-                                </div>
+                            [[if item.get('is_demo'):]]
+                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <span class="text-muted small">DEMO</span>
                             </div>
-                        </div>
-                    </a>
-                    [[pass]]
-                </div>
-                [[else:]]
-                <p class="text-muted small mb-0">No saved images yet. Run a detection to add to history.</p>
-                [[pass]]
-            </div>
-        </div>
-        [[pass]]
-    </div>
-    
-    <div class="col-md-8">
-        [[if results:]]
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Results</span>
-                <span class="badge bg-success">Found [[=len(results['bounding_boxes'])]] features</span>
-                <span class="badge bg-secondary">[[=f"{results['processing_time_ms']:.2f} ms"]]</span>
-            </div>
-            <div class="card-body">
-                <div class="d-flex align-items-start gap-3">
-                    <div class="flex-grow-1" style="min-width: 0;">
-                        <!-- Zoom controls -->
-                        <div class="btn-group btn-group-sm mb-2">
-                            <button type="button" class="btn btn-outline-secondary" onclick="zoomImage(-1)">−</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="resetZoom()">Reset</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="zoomImage(1)">+</button>
-                            <input type="text" class="form-control form-control-sm" id="zoomLevel" 
-                                   style="width: 70px; text-align: center;" value="100%">
-                        </div>
-                        <!-- Draggable image container -->
-                        <div id="imageContainer" class="border rounded bg-secondary bg-opacity-10" 
-                             style="height: 400px; overflow: hidden; cursor: grab; position: relative;">
-                            <img id="resultImage" src="[[=overlay_url]]" alt="Processed Image" 
-                                 style="position: absolute; image-rendering: pixelated; transform-origin: 0 0;"
-                                 draggable="false">
-                        </div>
-                        <div class="form-text">Drag to pan • Scroll to zoom • Double-click to reset</div>
-                        
-                        <!-- Pixel coordinate display -->
-                        <div id="pixelInfo" class="pixel-info-display mt-2 p-2 bg-light rounded border" 
-                             style="font-family: monospace; font-size: 0.9rem; display: none;">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <span class="badge bg-primary">Pixel X: <span id="pixelX">—</span></span>
-                                    <span class="badge bg-primary">Y: <span id="pixelY">—</span></span>
-                                </div>
-                                <div>
-                                    <span class="badge bg-success">RGB: <span id="pixelRGB">—</span></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-nowrap">
-                        <div class="bg-light rounded p-2 text-center">
-                            <div class="text-muted small">Dimensions</div>
-                            <div class="fw-bold">[[=image_width]] × [[=image_height]]</div>
-                            <div class="text-muted small">pixels</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Hidden canvas for pixel data extraction -->
-        <canvas id="pixelCanvas" style="display: none;"></canvas>
-        
-        <script>
-        (function() {
-            const container = document.getElementById('imageContainer');
-            const img = document.getElementById('resultImage');
-            let scale = 1;
-            let panX = 0, panY = 0;
-            let isDragging = false;
-            let startX, startY;
-            
-            function updateTransform() {
-                img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-                document.getElementById('zoomLevel').value = Math.round(scale * 100) + '%';
-            }
-            
-            function updatePixelInfo(x, y) {
-                document.getElementById('pixelX').textContent = x;
-                document.getElementById('pixelY').textContent = y;
-                
-                // Try to get pixel color from canvas
-                try {
-                    const canvas = document.getElementById('pixelCanvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Clear and draw the image to get pixel data
-                    canvas.width = img.naturalWidth;
-                    canvas.height = img.naturalHeight;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    const imageData = ctx.getImageData(x, y, 1, 1);
-                    const data = imageData.data;
-                    const r = data[0];
-                    const g = data[1];
-                    const b = data[2];
-                    const a = data[3];
-                    
-                    if (a === 0) {
-                        document.getElementById('pixelRGB').textContent = 'transparent';
-                    } else {
-                        document.getElementById('pixelRGB').textContent = `rgb(${r}, ${g}, ${b})`;
-                    }
-                } catch (e) {
-                    // Canvas might not be available, just show coordinates
-                    document.getElementById('pixelRGB').textContent = '—';
-                }
-            }
-            
-            function setZoomFromInput() {
-                const input = document.getElementById('zoomLevel');
-                const value = parseInt(input.value.replace('%', ''), 10);
-                if (!isNaN(value) && value >= 1 && value <= 2000) {
-                    const containerW = container.clientWidth;
-                    const containerH = container.clientHeight;
-                    const centerX = containerW / 2;
-                    const centerY = containerH / 2;
-                    
-                    const oldScale = scale;
-                    scale = value / 100;
-                    
-                    // Keep centered
-                    panX = centerX - (centerX - panX) * (scale / oldScale);
-                    panY = centerY - (centerY - panY) * (scale / oldScale);
-                    updateTransform();
-                } else {
-                    // Reset to current value if invalid
-                    input.value = Math.round(scale * 100) + '%';
-                }
-            }
-            
-            function initView() {
-                const containerW = container.clientWidth;
-                const containerH = container.clientHeight;
-                const imgW = img.naturalWidth;
-                const imgH = img.naturalHeight;
-                
-                // For small images, upscale to fit container (min 2x)
-                // For large images, scale down to fit
-                const fitScale = Math.min(containerW / imgW, containerH / imgH);
-                if (imgW < containerW && imgH < containerH) {
-                    scale = Math.max(fitScale, 2); // At least 2x for small images
-                } else {
-                    scale = fitScale;
-                }
-                
-                // Center the image
-                panX = (containerW - imgW * scale) / 2;
-                panY = (containerH - imgH * scale) / 2;
-                updateTransform();
-            }
-            
-            function zoomImage(dir) {
-                const containerW = container.clientWidth;
-                const containerH = container.clientHeight;
-                const centerX = containerW / 2;
-                const centerY = containerH / 2;
-                
-                const oldScale = scale;
-                scale = Math.max(0.5, Math.min(20, scale * (dir > 0 ? 1.25 : 0.8)));
-                
-                panX = centerX - (centerX - panX) * (scale / oldScale);
-                panY = centerY - (centerY - panY) * (scale / oldScale);
-                updateTransform();
-            }
-            
-            function resetZoom() {
-                initView();
-            }
-            
-            // Initialize on image load
-            img.onload = initView;
-            
-            // If image already loaded (cached), init now
-            if (img.complete) {
-                initView();
-            }
-            
-            // Drag to pan
-            container.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                startX = e.clientX - panX;
-                startY = e.clientY - panY;
-                container.style.cursor = 'grabbing';
-            });
-            
-            document.addEventListener('mousemove', (e) => {
-                // Update pixel info on hover
-                const rect = container.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                
-                // Check if mouse is over the container
-                if (mouseX >= 0 && mouseX < rect.width && mouseY >= 0 && mouseY < rect.height) {
-                    // Calculate actual pixel coordinates on the image
-                    const imgX = (mouseX - panX) / scale;
-                    const imgY = (mouseY - panY) / scale;
-                    
-                    // Check if within image bounds
-                    if (imgX >= 0 && imgX < img.naturalWidth && imgY >= 0 && imgY < img.naturalHeight) {
-                        updatePixelInfo(Math.floor(imgX), Math.floor(imgY));
-                        document.getElementById('pixelInfo').style.display = 'block';
-                    } else {
-                        document.getElementById('pixelInfo').style.display = 'none';
-                    }
-                } else {
-                    document.getElementById('pixelInfo').style.display = 'none';
-                }
-                
-                if (!isDragging) return;
-                panX = e.clientX - startX;
-                panY = e.clientY - startY;
-                updateTransform();
-            });
-            
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
-                container.style.cursor = 'grab';
-            });
-            
-            // Handle mouse leave
-            container.addEventListener('mouseleave', () => {
-                document.getElementById('pixelInfo').style.display = 'none';
-            });
-            
-            // Scroll to zoom
-            container.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const rect = container.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                
-                const oldScale = scale;
-                const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                scale = Math.max(0.5, Math.min(20, scale * delta));
-                
-                // Zoom toward mouse position
-                panX = mouseX - (mouseX - panX) * (scale / oldScale);
-                panY = mouseY - (mouseY - panY) * (scale / oldScale);
-                updateTransform();
-            });
-            
-            // Double-click to reset
-            container.addEventListener('dblclick', resetZoom);
-            
-            // Zoom input field - Enter to apply, blur to apply
-            const zoomInput = document.getElementById('zoomLevel');
-            zoomInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    setZoomFromInput();
-                    zoomInput.blur();
-                }
-            });
-            zoomInput.addEventListener('blur', setZoomFromInput);
-            
-            // Expose functions for buttons
-            window.zoomImage = zoomImage;
-            window.resetZoom = resetZoom;
-        })();
-        </script>
-        
-        <div class="card">
-            <div class="card-header">Detections</div>
-            <div class="card-body">
-                <div class="table-responsive" style="max-height: 300px;">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>X</th>
-                                <th>Y</th>
-                                <th>W</th>
-                                <th>H</th>
-                                <th>Score</th>
-                                <th>Color</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            [[for i, box in enumerate(results['bounding_boxes']):]]
-                            <tr>
-                                <td>[[=i+1]]</td>
-                                <td>[[=box['x']]]</td>
-                                <td>[[=box['y']]]</td>
-                                <td>[[=box['w']]]</td>
-                                <td>[[=box['h']]]</td>
-                                <td>[[=f"{box['score']:.4f}"]]</td>
-                                <td>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        [[if box.get('color_hex'):]]
-                                        <div style="width: 24px; height: 24px; background-color: [[=box['color_hex']]]; border: 1px solid #ccc; border-radius: 3px;"></div>
-                                        <span style="font-family: monospace; font-size: 0.85rem;">[[=box['color_hex']]]</span>
-                                        [[else:]]
-                                        <span style="color: #999;">N/A</span>
-                                        [[pass]]
-                                    </div>
-                                </td>
-                            </tr>
+                            [[else:]]
+                            <img src="[[=URL('uploads', item['image_filename'])]]" alt="Image" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
                             [[pass]]
-                        </tbody>
-                    </table>
-                </div>
-                
-                <hr>
-                <h6>JSON Response</h6>
-                <textarea class="form-control" rows="5" readonly>[[=json_data]]</textarea>
-            </div>
-        </div>
-        [[else:]]
-        <div class="alert alert-info">
-            Upload an image and set parameters to detect features.
-        </div>
-        [[pass]]
+                            <span class="text-truncate" style="max-width: 150px;" title="[[=item['image_filename']]]">[[=item['image_filename']]]</span>
+                        </div>
+                    </td>
+                    <td>[[=item['image_width']]] &times; [[=item['image_height']]] px</td>
+                    <td>
+                        <span class="badge bg-info text-dark">[[=item['num_features']]] Features</span>
+                    </td>
+                    <td>
+                        <a href="[[=URL('feature_identifier')]]?sample=[[=item['image_filename']]]" class="btn btn-sm btn-link text-primary p-0">
+                            [[if item.get('is_demo'):]]
+                            Re-examine (Demo)
+                            [[else:]]
+                            Re-examine
+                            [[pass]]
+                        </a>
+                    </td>
+                </tr>
+                [[pass]]
+            </tbody>
+        </table>
     </div>
+    [[else:]]
+    <div class="text-center py-5 bg-light rounded-3">
+        <p class="text-muted mb-0">No recent activity found. Use the tools above or populate demo data.</p>
+    </div>
+    [[pass]]
 </div>
 
