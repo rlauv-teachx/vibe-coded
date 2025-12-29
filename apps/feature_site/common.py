@@ -1,7 +1,7 @@
 from py4web import Session, Cache, Translator, DAL, Field
 from py4web.utils.url_signer import URLSigner
 from py4web.utils.dbstore import DBStore
-from .settings import APP_FOLDER
+from .settings import APP_FOLDER, T_FOLDER
 import os
 
 # Database
@@ -19,4 +19,7 @@ cache = Cache(size=1000)
 
 # URL Signer
 url_signer = URLSigner(session)
+
+# Translator
+T = Translator(T_FOLDER)
 
