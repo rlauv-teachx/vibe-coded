@@ -86,13 +86,18 @@
                 <div class="d-flex flex-column gap-2">
                     [[for item in history:]]
                     <a href="[[=URL('index')]]?sample=[[=item['image_filename']]]" 
-                       class="btn btn-sm btn-outline-secondary text-start" 
-                       style="white-space: normal; text-align: left; padding: 0.5rem;">
-                        <div class="small font-monospace">
-                            <div class="text-truncate">[[=item['image_filename']]]</div>
-                            <div class="text-muted small">
-                                [[=item['image_width']]]×[[=item['image_height']]] | 
-                                [[=len(item['results']['bounding_boxes'])]] features
+                       class="btn btn-sm btn-outline-secondary text-start p-1" 
+                       style="white-space: normal;"
+                       title="[[=item['image_filename']]]">
+                        <div class="d-flex align-items-center gap-2">
+                            <img src="[[=URL('uploads', item['image_filename'])]]" 
+                                 alt="Thumbnail" 
+                                 style="width: 60px; height: 60px; object-fit: cover; background: #f8f9fa; border-radius: 4px; image-rendering: pixelated;">
+                            <div class="small flex-grow-1">
+                                <div class="fw-bold">[[=item['image_width']]] × [[=item['image_height']]] px</div>
+                                <div class="text-muted small">
+                                    [[=item['num_features']]] features found
+                                </div>
                             </div>
                         </div>
                     </a>

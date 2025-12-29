@@ -209,4 +209,5 @@ __marimo__/
 # py4web
 .service
 apps/.service/
-apps/*/uploads/
+apps/*/uploads/
+apps/*/databases/

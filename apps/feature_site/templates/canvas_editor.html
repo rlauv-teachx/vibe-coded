@@ -336,9 +336,14 @@
             
             const timestamp = new Date();
             btn.innerHTML = `
-                <div class="small">
-                    <div class="text-truncate font-monospace">Drawing ${index + 1}</div>
-                    <div class="text-muted small">${item.canvas_width}×${item.canvas_height} px</div>
+                <div class="d-flex align-items-center gap-2">
+                    <img src="${item.canvas_url}" 
+                         alt="Thumbnail" 
+                         style="width: 40px; height: 40px; object-fit: cover; background: #f8f9fa; border-radius: 4px; image-rendering: pixelated;">
+                    <div class="small flex-grow-1" style="min-width: 0;">
+                        <div class="fw-bold">Drawing ${index + 1}</div>
+                        <div class="text-muted small">${item.canvas_width}×${item.canvas_height} px</div>
+                    </div>
                 </div>
             `;
             
@@ -354,9 +359,16 @@
     
     // Fetch initial history from page load
     function loadInitialHistory() {
-        // For now, we'll load history on demand when page loads
-        // This will be updated via AJAX when drawings are saved
+        // Load history from the data passed by the controller
+        const initialHistory = [[=XML(json_history or '[]')]];
+        if (initialHistory && initialHistory.length > 0) {
+            drawingHistory = initialHistory;
+            updateHistoryDisplay();
+        }
     }
+    
+    // Call loadInitialHistory when the script runs
+    loadInitialHistory();
     
     function getPixelColor(x, y) {
         if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {

@@ -86,13 +86,7 @@ def index():
                     'overlay_filename': overlay_filename,
                     'image_width': img_width,
                     'image_height': img_height,
-                    'results': results_dict,
-                    'form_data': {
-                        'min_w': min_w, 'max_w': max_w,
-                        'min_h': min_h, 'max_h': max_h,
-                        'threshold': threshold,
-                        'edge_detection_method': edge_detection_method
-                    },
+                    'num_features': len(results_dict['bounding_boxes']),
                     'timestamp': str(uuid.uuid4())
                 }
                 
@@ -205,13 +199,7 @@ def index():
             'overlay_filename': overlay_filename,
             'image_width': img_width,
             'image_height': img_height,
-            'results': results_dict,
-            'form_data': {
-                'min_w': min_w, 'max_w': max_w,
-                'min_h': min_h, 'max_h': max_h,
-                'threshold': threshold,
-                'edge_detection_method': edge_detection_method
-            },
+            'num_features': len(results_dict['bounding_boxes']),
             'timestamp': str(uuid.uuid4())
         }
         
@@ -354,16 +342,7 @@ def sample_generator():
             'image_filename': filename,
             'image_width': img_width,
             'image_height': img_height,
-            'features': features,
-            'form_data': {
-                'img_width': img_width, 'img_height': img_height,
-                'num_features': num_features,
-                'min_size': min_size, 'max_size': max_size,
-                'bg_color': bg_color_hex,
-                'random_colors': random_colors,
-                'feature_color': feature_color_hex,
-                'shape': shape
-            },
+            'num_features': len(features),
             'timestamp': str(uuid.uuid4())
         }
         
@@ -422,7 +401,7 @@ def canvas_editor():
                 'canvas_height': item['canvas_height'],
                 'timestamp': item['timestamp']
             })
-        return dict(drawing_history=history_with_urls)
+        return dict(drawing_history=history_with_urls, json_history=json.dumps(history_with_urls))
     
     # POST - save drawing
     try:
@@ -466,7 +445,7 @@ def canvas_editor():
                 'timestamp': item['timestamp']
             })
         
-        return dict(success=True, drawing_id=drawing_item['timestamp'], drawing_history=history_with_urls)
+        return dict(success=True, drawing_id=drawing_item['timestamp'], drawing_history=history_with_urls, json_history=json.dumps(history_with_urls))
         
     except Exception as e:
         import traceback
