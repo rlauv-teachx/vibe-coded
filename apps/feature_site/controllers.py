@@ -80,6 +80,8 @@ def feature_identifier():
                     raise ValueError("File not found")
                 
                 session['feature_identifier_state']['chosen_file'] = sample_filename
+                # Mark session as modified for nested mutation
+                session['feature_identifier_state'] = session['feature_identifier_state']
                 
             except Exception as e:
                 return dict(
@@ -124,6 +126,8 @@ def feature_identifier():
             'edge_detection_method': request.forms.get('edge_detection_method', 'canny')
         }
         session['feature_identifier_state']['form_data'] = form_data
+        # Mark session as modified
+        session['feature_identifier_state'] = session['feature_identifier_state']
         
         uploaded_file = request.files.get('image')
         
@@ -140,16 +144,18 @@ def feature_identifier():
             file_path = os.path.join(UPLOADS_FOLDER, safe_filename)
             uploaded_file.save(file_path)
             session['feature_identifier_state']['chosen_file'] = safe_filename
+            # Mark session as modified
+            session['feature_identifier_state'] = session['feature_identifier_state']
         else:
             # Use previously chosen file
-            safe_filename = session['feature_identifier_state']['chosen_file']
+            safe_filename = session['feature_identifier_state'].get('chosen_file')
             
         if not safe_filename:
-            return dict(error="No file selected", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=None)
+            return dict(error="No file selected", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=session['feature_identifier_state'].get('chosen_file'))
             
         file_path = os.path.join(UPLOADS_FOLDER, safe_filename)
         if not os.path.exists(file_path):
-             return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=None)
+             return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=)
 
         # Process
         detection_result = detect_features(
