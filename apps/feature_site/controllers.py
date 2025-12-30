@@ -155,7 +155,7 @@ def feature_identifier():
             
         file_path = os.path.join(UPLOADS_FOLDER, safe_filename)
         if not os.path.exists(file_path):
-             return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=)
+             return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=session['feature_identifier_state'].get('chosen_file'))
 
         # Process
         detection_result = detect_features(
@@ -398,6 +398,80 @@ def canvas_editor():
                 })
         return dict(success=False, error=str(e), drawing_history=history_with_urls)
 
+# Manage Data
+@action('manage_data')
+@action.uses('manage_data.html', session, T)
+def manage_data():
+    return dict(
+        feature_history=session.get('feature_identifier_history', []),
+        sample_history=session.get('sample_generator_history', []),
+        canvas_history=session.get('canvas_drawings', [])
+    )
+
+@action('delete_item', method='POST')
+@action.uses(session)
+def delete_item():
+    item_id = request.forms.get('item_id')
+    item_type = request.forms.get('item_type')
+    
+    if not item_id or not item_type:
+        redirect(URL('manage_data'))
+        
+    if item_type == 'feature':
+        history = session.get('feature_identifier_history', [])
+        for i, item in enumerate(history):
+            if item['timestamp'] == item_id:
+                # Delete files
+                for key in ['image_filename', 'overlay_filename']:
+                    filename = item.get(key)
+                    if filename:
+                        filepath = os.path.join(UPLOADS_FOLDER, filename)
+                        if os.path.exists(filepath) and not item.get('is_demo'):
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                # Remove from history
+                history.pop(i)
+                session['feature_identifier_history'] = history
+                break
+    elif item_type == 'sample':
+        history = session.get('sample_generator_history', [])
+        for i, item in enumerate(history):
+            if item['timestamp'] == item_id:
+                # Delete file
+                filename = item.get('image_filename')
+                if filename:
+                    filepath = os.path.join(UPLOADS_FOLDER, filename)
+                    if os.path.exists(filepath):
+                        try:
+                            os.remove(filepath)
+                        except:
+                            pass
+                # Remove from history
+                history.pop(i)
+                session['sample_generator_history'] = history
+                break
+    elif item_type == 'canvas':
+        history = session.get('canvas_drawings', [])
+        for i, item in enumerate(history):
+            if item['timestamp'] == item_id:
+                # Delete file
+                filename = item.get('canvas_filename')
+                if filename:
+                    filepath = os.path.join(UPLOADS_FOLDER, filename)
+                    if os.path.exists(filepath):
+                        try:
+                            os.remove(filepath)
+                        except:
+                            pass
+                # Remove from history
+                history.pop(i)
+                session['canvas_drawings'] = history
+                break
+                
+    redirect(URL('manage_data'))
+
 # Serve uploads
 @action('uploads/<filename>')
 def serve_upload(filename):
@@ -408,4 +482,3 @@ def serve_upload(filename):
     if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOADS_FOLDER)):
         abort(403)
     return static_file(filename, root=UPLOADS_FOLDER)
-
