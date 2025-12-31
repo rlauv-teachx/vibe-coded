@@ -1,0 +1,234 @@
+[[extend 'layout.html']]
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('index')]]">Home</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('feature_identifier')]]">Distinct Feature Identifier</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('sample_generator')]]">Sample Generator</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="[[=URL('canvas_editor')]]">Canvas Editor</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="[[=URL('image_filter')]]">Image Filter</a>
+    </li>
+</ul>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">Image Actions</div>
+            <div class="card-body">
+                <form action="[[=URL('image_filter')]]" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="upload">
+                    <div class="mb-3">
+                        <label class="form-label">Upload New Image</label>
+                        <div class="input-group">
+                            <input type="file" name="image" class="form-control" accept=".jpg,.jpeg,.png,.webp" required>
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </div>
+                    </div>
+                </form>
+
+                [[if current_image_url:]]
+                <hr>
+                
+                <h6 class="mb-2">Apply Filter</h6>
+                <form action="[[=URL('image_filter')]]" method="POST">
+                    <input type="hidden" name="action" value="filter">
+                    <div class="mb-3">
+                        <select name="filter_type" class="form-select mb-2">
+                            <option value="grayscale" [[='selected' if filter_type == 'grayscale' else '']]>Grayscale</option>
+                            <option value="blur" [[='selected' if filter_type == 'blur' else '']]>Blur</option>
+                            <option value="invert" [[='selected' if filter_type == 'invert' else '']]>Invert Colors</option>
+                            <option value="sepia" [[='selected' if filter_type == 'sepia' else '']]>Sepia</option>
+                            <option value="sharpen" [[='selected' if filter_type == 'sharpen' else '']]>Sharpen</option>
+                            <option value="edge_enhance" [[='selected' if filter_type == 'edge_enhance' else '']]>Edge Enhance</option>
+                        </select>
+                        
+                        <label class="form-label small">Intensity / Size</label>
+                        <input type="range" name="intensity" class="form-range" min="1" max="50" value="[[=intensity]]">
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary w-100 mb-3">Apply Filter</button>
+                </form>
+
+                <h6 class="mb-2">Manual Box Drawing</h6>
+                <div class="mb-3">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="drawModeToggle">
+                        <label class="form-check-label" for="drawModeToggle">
+                            Enable Drawing Mode
+                        </label>
+                    </div>
+                    <p class="small text-muted">Toggle to draw boxes. Drag on the image to draw a box, then click "Burn Boxes" to save them to the image.</p>
+                    
+                    <form action="[[=URL('image_filter')]]" method="POST" id="drawForm">
+                        <input type="hidden" name="action" value="draw_boxes">
+                        <input type="hidden" name="boxes" id="boxesData">
+                        <button type="button" class="btn btn-outline-success w-100" id="burnBoxesBtn" disabled>Burn Boxes to Image</button>
+                    </form>
+                </div>
+
+                <hr>
+                <form action="[[=URL('image_filter')]]" method="POST">
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="btn btn-danger w-100">Reset to Original</button>
+                </form>
+                [[pass]]
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        [[if error:]]
+        <div class="alert alert-danger">[[=error]]</div>
+        [[pass]]
+
+        [[if current_image_url:]]
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Current Image</span>
+                <a href="[[=current_image_url]]" download="processed_image.png" class="btn btn-sm btn-success">Download</a>
+            </div>
+            <div class="card-body text-center bg-light p-0 position-relative" style="overflow: hidden;">
+                <div id="canvasWrapper" style="display: inline-block; position: relative;">
+                    <img id="targetImage" src="[[=current_image_url]]" class="img-fluid" style="max-height: 600px; display: block;">
+                    <canvas id="overlayCanvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+                </div>
+            </div>
+        </div>
+        [[else:]]
+        <div class="alert alert-info text-center py-5">
+            <h4>No Image Selected</h4>
+            <p>Upload an image to start filtering and detecting features.</p>
+        </div>
+        [[pass]]
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const img = document.getElementById('targetImage');
+    const canvas = document.getElementById('overlayCanvas');
+    const wrapper = document.getElementById('canvasWrapper');
+    const toggle = document.getElementById('drawModeToggle');
+    const burnBtn = document.getElementById('burnBoxesBtn');
+    const boxesInput = document.getElementById('boxesData');
+    const drawForm = document.getElementById('drawForm');
+    
+    if (!img || !canvas) return;
+
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let boxes = []; // Array of {x, y, w, h} (percentages relative to image size)
+
+    // Sync canvas size to image
+    function resizeCanvas() {
+        canvas.width = img.clientWidth;
+        canvas.height = img.clientHeight;
+        redraw();
+    }
+    
+    img.onload = resizeCanvas;
+    window.addEventListener('resize', resizeCanvas);
+    // Initial call in case cached
+    if (img.complete) resizeCanvas();
+
+    // Toggle Drawing Mode
+    toggle.addEventListener('change', function() {
+        if (this.checked) {
+            canvas.style.pointerEvents = 'auto';
+            canvas.style.cursor = 'crosshair';
+            resizeCanvas(); // Ensure size is correct when enabling
+        } else {
+            canvas.style.pointerEvents = 'none';
+            canvas.style.cursor = 'default';
+        }
+    });
+
+    // Drawing Logic
+    canvas.addEventListener('mousedown', function(e) {
+        if (!toggle.checked) return;
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        isDrawing = true;
+    });
+
+    canvas.addEventListener('mousemove', function(e) {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        currentX = e.clientX - rect.left;
+        currentY = e.clientY - rect.top;
+        redraw(true); // Draw current creating box
+    });
+
+    canvas.addEventListener('mouseup', function(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        
+        // Finalize box
+        const w = currentX - startX;
+        const h = currentY - startY;
+        
+        if (Math.abs(w) > 5 && Math.abs(h) > 5) { // Minimum size threshold
+            // Store as normalized percentages (0-1) to handle resizing/backend scaling
+            const box = {
+                x: (w > 0 ? startX : currentX) / canvas.width,
+                y: (h > 0 ? startY : currentY) / canvas.height,
+                w: Math.abs(w) / canvas.width,
+                h: Math.abs(h) / canvas.height
+            };
+            boxes.push(box);
+            updateBoxesInput();
+        }
+        redraw();
+    });
+
+    function redraw(preview = false) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw saved boxes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        
+        boxes.forEach(box => {
+            ctx.strokeRect(
+                box.x * canvas.width, 
+                box.y * canvas.height, 
+                box.w * canvas.width, 
+                box.h * canvas.height
+            );
+        });
+
+        // Draw preview box
+        if (preview && isDrawing) {
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+            ctx.setLineDash([]);
+        }
+    }
+
+    function updateBoxesInput() {
+        boxesInput.value = JSON.stringify(boxes);
+        burnBtn.disabled = boxes.length === 0;
+    }
+
+    // Submit handler
+    burnBtn.addEventListener('click', function() {
+        if (boxes.length > 0) {
+            drawForm.submit();
+        }
+    });
+});
+</script>
