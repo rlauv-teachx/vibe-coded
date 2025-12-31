@@ -12,6 +12,7 @@ from .settings import UPLOADS_FOLDER
 from .modules.feature_identifier.detector import detect_features
 from .modules.feature_identifier.overlay import create_overlay_image
 from .modules.demo_utils import generate_dummy_history, create_sample_image
+from .modules.receipt_generator import create_sample_receipts
 
 # Dashboard
 @action('index')
@@ -32,6 +33,8 @@ def clear_history():
     session['feature_identifier_history'] = []
     session['sample_generator_history'] = []
     session['canvas_drawings'] = []
+    session['receipt_history'] = []
+    session['receipt_samples_data'] = {}
     redirect(URL('index'))
 
 # Distinct Feature Identifier
@@ -482,3 +485,112 @@ def serve_upload(filename):
     if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOADS_FOLDER)):
         abort(403)
     return static_file(filename, root=UPLOADS_FOLDER)
+
+# Receipt Scanner
+@action('receipt_scanner', method=['GET', 'POST'])
+@action.uses('receipt_scanner.html', session, T)
+def receipt_scanner():
+    if 'receipt_history' not in session:
+        session['receipt_history'] = []
+    
+    if 'receipt_samples_data' not in session:
+        session['receipt_samples_data'] = {}
+        
+    error = None
+    results = None
+    chosen_file = None
+    
+    # Handle GET
+    if request.method == 'GET':
+        sample = request.params.get('sample')
+        if sample:
+            chosen_file = sample
+            # Check if it's a known sample and load data
+            if chosen_file in session.get('receipt_samples_data', {}):
+                results = session['receipt_samples_data'][chosen_file]
+                
+        return dict(
+            error=None,
+            results=results,
+            image_url=URL('uploads', chosen_file) if chosen_file else None,
+            history=session['receipt_history'],
+            chosen_file=chosen_file
+        )
+
+    # Handle POST
+    uploaded_file = request.files.get('image')
+    
+    safe_filename = None
+    if uploaded_file and uploaded_file.filename:
+        filename = uploaded_file.filename
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+             error = "Invalid file type"
+        else:
+            safe_filename = f"{uuid.uuid4()}{ext}"
+            file_path = os.path.join(UPLOADS_FOLDER, safe_filename)
+            uploaded_file.save(file_path)
+            chosen_file = safe_filename
+    elif request.forms.get('sample'):
+        chosen_file = request.forms.get('sample')
+    
+    if not chosen_file and not error:
+        # If we are just viewing a sample passed via form hidden field
+        if request.forms.get('chosen_file'):
+            chosen_file = request.forms.get('chosen_file')
+        else:
+            error = "No file selected"
+        
+    if not error and chosen_file:
+        # Check if it matches known samples
+        if chosen_file in session.get('receipt_samples_data', {}):
+            results = session['receipt_samples_data'][chosen_file]
+        else:
+            # Fallback / Mock
+            results = {
+                "error": "OCR engine could not detect valid receipt data. Please use one of the generated samples."
+            }
+            
+        # Add to history
+        history_item = {
+            'image_filename': chosen_file,
+            'timestamp': str(uuid.uuid4()),
+            'total': results.get('total', 'N/A') if 'error' not in results else 'Error',
+            'is_sample': chosen_file in session.get('receipt_samples_data', {})
+        }
+        
+        # Avoid duplicates for samples if recently added? 
+        # For simplicity, just add.
+        session['receipt_history'].insert(0, history_item)
+        session['receipt_history'] = session['receipt_history'][:20]
+
+    return dict(
+        error=error,
+        results=results,
+        image_url=URL('uploads', chosen_file) if chosen_file else None,
+        history=session['receipt_history'],
+        chosen_file=chosen_file
+    )
+
+@action('populate_receipts', method='POST')
+@action.uses(session)
+def populate_receipts():
+    samples = create_sample_receipts(UPLOADS_FOLDER)
+    if 'receipt_samples_data' not in session:
+        session['receipt_samples_data'] = {}
+    if 'receipt_history' not in session:
+        session['receipt_history'] = []
+        
+    # Add to history and data store
+    for filename, data in samples:
+        session['receipt_samples_data'][filename] = data
+        
+        history_item = {
+            'image_filename': filename,
+            'timestamp': str(uuid.uuid4()),
+            'total': data['total'],
+            'is_sample': True
+        }
+        session['receipt_history'].insert(0, history_item)
+        
+    redirect(URL('receipt_scanner'))
