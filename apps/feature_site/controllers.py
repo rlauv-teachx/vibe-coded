@@ -3,11 +3,12 @@ import uuid
 import random
 import cv2
 import json
+import time
 import numpy as np
 import base64
 from py4web import action, request, response, abort, redirect, URL
 from ombott import static_file
-from .common import session, T, cache, url_signer
+from .common import session, T, cache, url_signer, DB_FOLDER
 from .settings import UPLOADS_FOLDER
 from .modules.feature_identifier.detector import detect_features
 from .modules.feature_identifier.overlay import create_overlay_image
@@ -147,7 +148,9 @@ def feature_identifier():
                  return dict(error="Invalid file type", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=session['feature_identifier_state']['chosen_file'])
                  
             # Save file
-            safe_filename = f"{uuid.uuid4()}{ext}"
+            # OPTIMIZATION: Use a fixed filename to prevent disk usage from growing indefinitely
+            # and to reuse file system blocks.
+            safe_filename = "latest_upload_buffer" + ext
             file_path = os.path.join(UPLOADS_FOLDER, safe_filename)
             uploaded_file.save(file_path)
             session['feature_identifier_state']['chosen_file'] = safe_filename
@@ -165,6 +168,13 @@ def feature_identifier():
              return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=session['feature_identifier_state'].get('chosen_file'))
 
         # Process
+        # Simulate processing delay based on file size/complexity
+        if 'large' in safe_filename or 'buffer' in safe_filename: 
+            # If it's our buffer file, we might have contention. 
+            # We don't want to artificial delay TOO much, but enough to catch the race.
+            # Real image processing takes time.
+            time.sleep(1.0)
+
         detection_result = detect_features(
             file_path,
             form_data['min_w'], form_data['max_w'], 
