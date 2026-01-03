@@ -168,13 +168,6 @@ def feature_identifier():
              return dict(error="File not found", results=None, image_url=None, overlay_url=None, json_data=None, image_width=None, image_height=None, form_data=form_data, history=session['feature_identifier_history'], chosen_file=session['feature_identifier_state'].get('chosen_file'))
 
         # Process
-        # Simulate processing delay based on file size/complexity
-        if 'large' in safe_filename or 'buffer' in safe_filename: 
-            # If it's our buffer file, we might have contention. 
-            # We don't want to artificial delay TOO much, but enough to catch the race.
-            # Real image processing takes time.
-            time.sleep(1.0)
-
         detection_result = detect_features(
             file_path,
             form_data['min_w'], form_data['max_w'], 

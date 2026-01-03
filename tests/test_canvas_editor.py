@@ -4,6 +4,7 @@ import base64
 import numpy as np
 import cv2
 import json
+import threading
 from tests.utils import BASE_URL
 
 class TestCanvasEditor(unittest.TestCase):
@@ -76,6 +77,39 @@ class TestCanvasEditor(unittest.TestCase):
         # Check that history has items.
         # The controller passes json_history to the template.
         self.assertIn("canvas_filename", response.text)
+
+    def test_concurrent_saves(self):
+        """Test concurrent saving of drawings."""
+        results = []
+        
+        def save_drawing(user_id):
+            session = requests.Session()
+            _, buffer = cv2.imencode('.png', np.zeros((20, 20, 3), dtype=np.uint8))
+            b64_str = base64.b64encode(buffer).decode('utf-8')
+            data_url = f"data:image/png;base64,{b64_str}"
+            
+            payload = {
+                'canvas_data': data_url,
+                'canvas_width': 20,
+                'canvas_height': 20
+            }
+            try:
+                response = session.post(self.url, data=payload)
+                if response.status_code == 200 and "drawing_history" in response.text:
+                    results.append(user_id)
+            except Exception:
+                pass
+
+        threads = []
+        for i in range(5):
+            t = threading.Thread(target=save_drawing, args=(i,))
+            threads.append(t)
+            t.start()
+            
+        for t in threads:
+            t.join()
+            
+        self.assertEqual(len(results), 5)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,6 @@
 import unittest
 import requests
+import threading
 from tests.utils import BASE_URL
 
 class TestSampleGenerator(unittest.TestCase):
@@ -48,6 +49,35 @@ class TestSampleGenerator(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # Should show error
         self.assertIn("invalid literal for int", response.text)
+
+    def test_concurrent_generation(self):
+        """Test concurrent generation of samples."""
+        results = []
+        
+        def generate_sample(idx):
+            session = requests.Session()
+            params = {
+                'img_width': 200,
+                'img_height': 200,
+                'num_features': 5
+            }
+            try:
+                response = session.post(self.url, data=params)
+                if response.status_code == 200 and 'uploads/sample_' in response.text:
+                    results.append(idx)
+            except Exception:
+                pass
+
+        threads = []
+        for i in range(5):
+            t = threading.Thread(target=generate_sample, args=(i,))
+            threads.append(t)
+            t.start()
+            
+        for t in threads:
+            t.join()
+            
+        self.assertEqual(len(results), 5)
 
 if __name__ == '__main__':
     unittest.main()

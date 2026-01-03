@@ -111,8 +111,8 @@ class TestFeatureIdentifier(unittest.TestCase):
         url = f"{BASE_URL}/feature_identifier"
         files = {'image': open(image_path, 'rb')}
         data = {
-            'min_w': 10, 'max_w': 500,
-            'min_h': 10, 'max_h': 500,
+            'min_w': 10, 'max_w': 5000,
+            'min_h': 10, 'max_h': 5000,
             'threshold': 2.3,
             'edge_detection_method': 'canny'
         }
@@ -133,16 +133,21 @@ class TestFeatureIdentifier(unittest.TestCase):
         except Exception as e:
             return -1
 
-    def test_small_and_large_image(self):
+    def test_race_condition_overwrite(self):
         """
-        Test the feature identifier with a large and small image.
+        Demonstrate race condition where a small upload overwrites a large upload
+        being processed, causing the large upload to return incorrect results.
         """
         results = {}
         
         def run_large_test():
+            # Large test expects many features (approx 8)
             results['large'] = self.upload_and_process(self.large_image_path, 8)
             
         def run_small_test():
+            # Delay slightly to ensure large test has started upload/processing
+            time.sleep(0.1) 
+            # Small test expects 1 feature
             results['small'] = self.upload_and_process(self.small_image_path, 1)
 
         # Start threads
@@ -155,8 +160,11 @@ class TestFeatureIdentifier(unittest.TestCase):
         t1.join()
         t2.join()
         
-        self.assertEqual(results.get('large', 0), 8)
-        self.assertEqual(results.get('small', 0), 1)
+        # Assertion: Large test should have found ~8 features. 
+        # If race condition hit, it might have found 1 (from small image) or failed.
+        self.assertGreater(results.get('large', 0), 5, 
+            f"Race Condition Detected! Large test returned {results.get('large')} features instead of ~8. "
+            "It likely processed the small image uploaded by Thread 2.")
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,7 @@
 import unittest
 import requests
 import os
+import threading
 from tests.utils import BASE_URL, create_test_image, remove_test_image
 
 class TestImageFilter(unittest.TestCase):
@@ -65,6 +66,33 @@ class TestImageFilter(unittest.TestCase):
         response = self.session.post(self.url, data=data)
         self.assertEqual(response.status_code, 200)
         self.assertIn("detected_", response.text)
+
+    def test_concurrent_uploads(self):
+        """Test concurrent uploads."""
+        results = []
+        
+        def upload_image(idx):
+            session = requests.Session()
+            try:
+                with open(self.test_image, 'rb') as f:
+                    files = {'image': f}
+                    data = {'action': 'upload'}
+                    response = session.post(self.url, files=files, data=data)
+                    if response.status_code == 200 and 'uploads/' in response.text:
+                        results.append(idx)
+            except Exception:
+                pass
+
+        threads = []
+        for i in range(5):
+            t = threading.Thread(target=upload_image, args=(i,))
+            threads.append(t)
+            t.start()
+            
+        for t in threads:
+            t.join()
+            
+        self.assertEqual(len(results), 5)
 
 if __name__ == '__main__':
     unittest.main()

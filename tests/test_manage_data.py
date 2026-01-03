@@ -1,5 +1,6 @@
 import unittest
 import requests
+import threading
 from tests.utils import BASE_URL
 
 class TestManageData(unittest.TestCase):
@@ -72,6 +73,41 @@ class TestManageData(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         # Should just do nothing and redirect
         self.assertTrue(resp.url.endswith("manage_data"))
+
+    def test_concurrent_deletes(self):
+        """Test concurrent deletion of the same item."""
+        item_id = self.create_sample_item()
+        self.assertIsNotNone(item_id)
+        
+        results = []
+        def delete_item():
+            session = requests.Session()
+            payload = {'item_id': item_id, 'item_type': 'sample'}
+            try:
+                # We don't check for 200 strictly as the goal is to ensure server doesn't crash
+                resp = session.post(self.delete_url, data=payload, allow_redirects=True)
+                if resp.status_code == 200:
+                    results.append(True)
+            except Exception:
+                pass
+
+        threads = []
+        for i in range(5):
+            t = threading.Thread(target=delete_item)
+            threads.append(t)
+            t.start()
+            
+        for t in threads:
+            t.join()
+            
+        # At least one should have succeeded (conceptually), but all might return 200 because 
+        # deleting a non-existent item might just redirect (as seen in test_delete_non_existent_item).
+        # The main check is that the server didn't crash.
+        self.assertTrue(len(results) > 0)
+        
+        # Verify it is gone
+        resp = self.session.get(self.url)
+        self.assertNotIn(item_id, resp.text)
 
 if __name__ == '__main__':
     unittest.main()
